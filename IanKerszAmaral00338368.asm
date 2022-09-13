@@ -36,6 +36,8 @@ MsgIgual			db	" = ", 0
 FileExtensionTXT	db	".txt", 0
 FileExtensionKRP	db	".krp", 0
 
+OkayMessage			db 	"Files Okay", 0
+
 Contador		dw		26 dup (?)	; A=0, B=1, ..., Z=25
 
 ; Vari�vel interna usada na rotina printf_w
@@ -80,15 +82,23 @@ ModificaNomes:
 	call	printf_s
 
 CriaOSArquivos:
-	; call 	CreateFileHandles
-    
-FechaArquivo:
-	;	fclose(InputFileHandle->bx)
-	mov		bx,InputFileHandle
-	call 	fclose
+	call 	CreateFileHandles
 
+	;	Verifica se os arquivos foram abertos corretamente
+	lea     bx,OkayMessage
+    call    printf_s
+	;	printf ("\r\n");
+	lea		bx,MsgCRLF
+	call	printf_s
+
+FechaArquivoOutput:
 	;	fclose(OutputFileHandle->bx)
 	mov		bx,OutputFileHandle
+	call 	fclose
+
+FechaArquivoInput:
+	;	fclose(InputFileHandle->bx)
+	mov		bx,InputFileHandle
 	call 	fclose
 
 Final:
@@ -129,39 +139,38 @@ ModifyNameWithExtension endp
 ;--------------------------------------------------------------------
 CreateFileHandles proc 	near
 
-; 	;	if ( (ax=fopen(ah=0x3d, dx->FileName) ) ) {
-; 	;		printf("Erro na abertura do arquivo.\r\n");
-; 	;		exit(1);
-; 	;	}
-; 	mov		al,0
-; 	lea		dx,InputFileName
-; 	mov		ah,3dh
-; 	int		21h
-; 	jnc		ContinuaCreateFiles1
-; 	lea		bx,MsgErroOpenFile
-; 	call	printf_s
-; 	mov		al,1
-; 	jmp		Final
+	;	if ( (ax=fopen(ah=0x3d, dx->InputFileName) ) ) {
+	;		printf("Erro na abertura do arquivo.\r\n");
+	;		exit(1);
+	;	}
+	lea		dx,InputFileName
+	call 	fopen
+	jnc		ContinuaCreateFiles1
+	lea		bx,MsgErroOpenFile
+	call	printf_s
+	mov		al,1
+	jmp		Final
 
-; ContinuaCreateFiles1:
-; 	;	FileHandle = ax
-; 	mov		InputFileHandle,ax
+ContinuaCreateFiles1:
+	;	FileHandle = ax
+	mov		InputFileHandle,bx
 
 
+	;	if ( (ax=fopen(ah=0x3d, dx->OutputFileName) ) ) {
+	;		printf("Erro na abertura do arquivo.\r\n");
+	;		exit(1);
+	;	}
+	lea		dx,OutputFileName
+	call	fcreate
+	jnc		ContinuaCreateFiles2
+	lea		bx,MsgErroOpenFile
+	call	printf_s
+	mov		al,1
+	jmp		FechaArquivoInput
 
-; 	mov		al,0
-; 	lea		dx,OutputFileName
-; 	mov		ah,3dh
-; 	int		21h
-; 	jnc		ContinuaCreateFiles2
-; 	lea		bx,MsgErroOpenFile
-; 	call	printf_s
-; 	mov		al,1
-; 	jmp		Final
-
-; ContinuaCreateFiles2:
-; 		;	FileHandle = ax
-; 	mov		OutputFileHandle,ax
+ContinuaCreateFiles2:
+		;	FileHandle = ax
+	mov		OutputFileHandle,bx
 
 	ret
 
