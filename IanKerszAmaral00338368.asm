@@ -27,6 +27,9 @@ OutputFileName	db		256 dup (?)		; Nome do arquivo de output
 OutputFileHandle dw		0				; Handler do arquivo de output
 OutputFileBuffer db		10 dup (?)		; Buffer de leitura do arquivo
 
+CriptoWord		db		256 dup (?)		; Chave de criptografia
+
+MsgPedeCripto		db	"Frase a ser criptografada: ", 0
 MsgPedeArquivo		db	"Nome do arquivo: ", 0
 MsgErroOpenFile		db	"Erro na abertura do arquivo.", CR, LF, 0
 MsgErroReadFile		db	"Erro na leitura do arquivo.", CR, LF, 0
@@ -57,10 +60,6 @@ sw_m	dw	0
 	lea		ax,FileName
 	call	PrintStringAndGetString
 
-	;	printf ("\r\n");
-	lea		bx,MsgCRLF
-	call	printf_s
-
 ModificaNomes:
 	lea		ax,InputFileName
 	lea		bx,FileExtensionTXT
@@ -72,26 +71,21 @@ ModificaNomes:
 
 	;	Mostra se os nomes foram copiados corretamente
 	lea     bx,InputFileName
-    call    printf_s
-	;	printf ("\r\n");
-	lea		bx,MsgCRLF
-	call	printf_s
+    call    Printf_SNL
 
 	lea     bx,OutputFileName
-    call    printf_s
-	;	printf ("\r\n");
-	lea		bx,MsgCRLF
-	call	printf_s
+    call    Printf_SNL
 
 CriaOSArquivos:
 	call 	CreateFileHandles
 
-	;	Verifica se os arquivos foram abertos corretamente
-	lea     bx,OkayMessage
-    call    printf_s
-	;	printf ("\r\n");
-	lea		bx,MsgCRLF
-	call	printf_s
+PedeFraseCript:
+	lea		bx,MsgPedeCripto
+	lea 	ax,CriptoWord
+	call 	PrintStringAndGetString
+
+	lea		bx,CriptoWord
+	call	Printf_SNL
 
 FechaArquivoOutput:
 	;	fclose(OutputFileHandle->bx)
@@ -105,6 +99,17 @@ FechaArquivoInput:
 
 Final:
 	.exit
+
+
+;====================================================================
+;Msg em bx e posta na tela e depois nova linha e criada
+Printf_SNL proc near
+	call    printf_s
+	;	printf ("\r\n");
+	lea		bx,MsgCRLF
+	call	printf_s
+	ret
+Printf_SNL endp
 
 ModifyNameWithExtension proc near
 
@@ -184,28 +189,31 @@ CreateFileHandles endp
 ; lea		ax,LocaldeOutput
 ;--------------------------------------------------------------------
 PrintStringAndGetString	proc	near
-		push 	ax
-		;lea		bx,MsgPedeArquivo			; Coloca mensagem que pede o nome do arquivo
-		call	printf_s
+	push 	ax
+	call	printf_s
 
-		mov		ah,0ah						; Le uma linha do teclado
-		lea		dx,StringBuffer
-		mov		byte ptr StringBuffer,100
-		int		21h
+	mov		ah,0ah						; Le uma linha do teclado
+	lea		dx,StringBuffer
+	mov		byte ptr StringBuffer,100
+	int		21h
 
-		mov		cl,StringBuffer+1			; Coloca o tamanho do nome do arquivo em FileNameLength
-		mov		FileNameLength,cl
+	mov		cl,StringBuffer+1			; Coloca o tamanho do nome do arquivo em FileNameLength
+	mov		FileNameLength,cl
 
-		lea		si,StringBuffer+2			; Copia do buffer de teclado para o FileName
-		pop		di
-		mov		cl,StringBuffer+1
-		mov		ch,0
-		mov		ax,ds						; Ajusta ES=DS para poder usar o MOVSB
-		mov		es,ax
-		rep 	movsb
+	lea		si,StringBuffer+2			; Copia do buffer de teclado para o FileName
+	pop		di
+	mov		cl,StringBuffer+1
+	mov		ch,0
+	mov		ax,ds						; Ajusta ES=DS para poder usar o MOVSB
+	mov		es,ax
+	rep 	movsb
 
-		mov		byte ptr es:[di],0			; Coloca marca de fim de string
-		ret
+	mov		byte ptr es:[di],0			; Coloca marca de fim de string
+		
+	;	printf ("\r\n");
+	lea		bx,MsgCRLF
+	call	printf_s
+	ret
 PrintStringAndGetString	endp
 
 
