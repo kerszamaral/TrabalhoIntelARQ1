@@ -1,3 +1,4 @@
+;Abacate
 ; Ian Kersz Amaral - Cartão: 00338368
 ;
 ;====================================================================
@@ -41,12 +42,33 @@ MsgCRLF				db	CR, LF, 0
 FileExtensionTXT	db	".txt", 0
 FileExtensionKRP	db	".krp", 0
 
+LetraAProcurar		db	1 dup (?)		; Letra a ser procurada
+
+Letterbuffer		db	10 dup (?)		; Buffer para leitura de letras
+
+contador			dw	1 dup (?)	; Contador de letras
+UsedLocationsSize	dw	1	dup (?)
+UsedLocations		dw	156 dup (?)		; Vetor de localizacoes ja usadas, bem maior do que as 100 necessarias por agr
+
+SaveLetra			db	1 dup (?)		; Letra a ser salva
+OcorrenciaLetra		dw	1 dup (?)		; Ocorrencia da letra
+
+
 MAXSTRING	equ		196		; Tamanho maximo da string - 4 para extensoes
 String	db		MAXSTRING dup (?)		; Usado na funcao gets
+
+; Vari�vel interna usada na rotina printf_w
+BufferWRWORD	db		10 dup (?)
+
+; Variaveis para uso interno na fun��o sprintf_w
+sw_n	dw	0
+sw_f	db	0
+sw_m	dw	0
 
 	.code
 	.startup
 
+	mov	UsedLocations,0
 	;GetFileName();	// Pega o nome do arquivo de origem -> FileNameSrc
 	lea		bx,MsgPedeArquivo
 	lea		ax,FileName
@@ -99,60 +121,30 @@ PegaFraseCripto:
 	lea 	ax,CriptoWord
 	call 	PrintStringAndGetString
 
-Continua2:
+	;Setup end location of string
+	lea		bx,CriptoWord	; bx = CriptoWord
+	mov		di,0			; di = CriptoLocation
+	push	bx				; 	salva o ponteiro
+	push	di				;	salva o indice
 
-	;do {
-	;	if ( (CF,DL,AX = getChar(FileHandleSrc)) ) {
-	;		printf("");
-	;		fclose(FileHandleSrc)
-	;		fclose(FileHandleDst)
-	;		exit(1)
-	;	}
-	mov		bx,FileHandleSrc
-	call	getChar
-	jnc		Continua3
-	lea		bx, MsgErroReadFile
-	call	printf_s
-	mov		bx,FileHandleSrc
-	call	fclose
-	mov		bx,FileHandleDst
-	call	fclose
-	.exit	1
+NextCharInCrypto:
+	call	ReOpenFileSrc
+	pop		bx
+	pop		di
+	mov		al,[bx+di]	; 	Get char
+	inc 	di			; 	incrementa o indice
+	push	bx			; 	salva o ponteiro
+	push	di			;	salva o indice
 
-Continua3:
+	cmp		al,0
+	je		TerminouArquivo ;String terminada
 
-	;	if (AX==0) break;
-	cmp		ax,0
-	jz		TerminouArquivo
-	
-	;	dl = toUpper(dl)
-	cmp		dl,'a'
-	jb		Continua4
-	cmp		dl,'z'
-	ja		Continua4
-	sub		dl,20h		
+	cmp		al,'!'
+	jb		NextCharInCrypto
+	cmp		al,'~'	
+	ja		NextCharInCrypto
+	jmp 	Procurar	; 	Se for um char valido, procura a letra
 
-Continua4:
-
-	;	if ( setChar(FileHandleDst, DL) == 0) continue;
-	mov		bx,FileHandleDst
-	call	setChar
-	jnc		Continua2
-
-	;	printf ("Erro na escrita....;)")
-	;	fclose(FileHandleSrc)
-	;	fclose(FileHandleDst)
-	;	exit(1)
-	lea		bx, MsgErroWriteFile
-	call	printf_s
-	mov		bx,FileHandleSrc		; Fecha arquivo origem
-	call	fclose
-	mov		bx,FileHandleDst		; Fecha arquivo destino
-	call	fclose
-	.exit	1
-	
-	;} while(1);
-		
 TerminouArquivo:
 	;fclose(FileHandleSrc)
 	;fclose(FileHandleDst)
@@ -162,6 +154,81 @@ TerminouArquivo:
 	mov		bx,FileHandleDst	; Fecha arquivo destino
 	call	fclose
 	.exit	0
+
+ProcurarNext:
+	mov		al,SaveLetra
+	inc		OcorrenciaLetra
+	mov		SaveLetra,al
+	mov		dl,al
+	mov		bx,FileHandleSrc
+	mov		cx,OcorrenciaLetra
+	
+	call 	procLetra
+	mov		cx,ax
+	mov		di,0
+
+Procurar:
+	mov		SaveLetra,al
+	mov		OcorrenciaLetra,1
+	mov		dl,al
+	mov		bx,FileHandleSrc
+	mov		cx,OcorrenciaLetra
+	
+	call 	procLetra
+	mov		cx,ax
+	mov		di,0
+
+Revisar:
+	mov		ax,[UsedLocations+di]
+	cmp		cx,ax
+	je		ProcurarNext
+	inc		di
+	cmp		UsedLocationsSize,di
+	jae		Revisar
+	mov		UsedLocationsSize,di
+	mov		ax,2
+	mul		di
+	mov		di,ax
+	mov		[UsedLocations+di],cx
+
+Escreve:
+	mov		bx,FileHandleDst
+	cmp		cx,1000
+	ja		mil
+	mov		dl,'0'
+	call 	setChar
+mil:
+	cmp		cx,100
+	ja		cent
+	mov		dl,'0'
+	call 	setChar
+cent:
+	cmp		cx,10
+	ja		dez
+	mov		dl,'0'
+	call 	setChar
+dez:
+	lea		bx,Letterbuffer
+	mov		ax,cx
+	call 	sprintf_w
+	lea		bx,Letterbuffer
+
+LoopPrintString:
+	mov		dl,[bx]
+	cmp 	dl,0
+	je		FimPrintString
+	push	bx
+	mov		bx,FileHandleDst
+	call	setChar
+	pop		bx
+	inc		bx
+	jmp		LoopPrintString
+	
+FimPrintString:
+	mov		bx,FileHandleDst
+	mov		dl,' '
+	call 	setChar
+	jmp 	NextCharInCrypto
 
 ;===============================================================================
 ;	Subrotinas
@@ -289,6 +356,71 @@ ps_1:
 	ret
 printf_s	endp
 
+
+;--------------------------------------------------------------------
+;Fun��o: Escreve o valor de AX na tela
+;		printf("%
+;--------------------------------------------------------------------
+printf_w	proc	near
+	; sprintf_w(AX, BufferWRWORD)
+	lea		bx,BufferWRWORD
+	call	sprintf_w
+	
+	; printf_s(BufferWRWORD)
+	lea		bx,BufferWRWORD
+	call	printf_s
+	
+	ret
+printf_w	endp
+;--------------------------------------------------------------------
+;Fun��o: Converte um inteiro (n) para (string)
+;		 sprintf(string->BX, "%d", n->AX)
+;--------------------------------------------------------------------
+sprintf_w	proc	near
+	mov		sw_n,ax
+	mov		cx,5
+	mov		sw_m,10000
+	mov		sw_f,0
+	
+sw_do:
+	mov		dx,0
+	mov		ax,sw_n
+	div		sw_m
+	
+	cmp		al,0
+	jne		sw_store
+	cmp		sw_f,0
+	je		sw_continue
+sw_store:
+	add		al,'0'
+	mov		[bx],al
+	inc		bx
+	
+	mov		sw_f,1
+sw_continue:
+	
+	mov		sw_n,dx
+	
+	mov		dx,0
+	mov		ax,sw_m
+	mov		bp,10
+	div		bp
+	mov		sw_m,ax
+	
+	dec		cx
+	cmp		cx,0
+	jnz		sw_do
+
+	cmp		sw_f,0
+	jnz		sw_continua2
+	mov		[bx],'0'
+	inc		bx
+sw_continua2:
+
+	mov		byte ptr[bx],0
+	ret		
+sprintf_w	endp
+
 ;----------------------------------------------------------------------
 ; strcat(char *s1 -> ax, char *s2 -> bx)
 ; Pega a extensao salva em bx, pega o nome do arquivo e coloca na string apontada por ax
@@ -355,6 +487,72 @@ PrintStringAndGetString	proc	near
 	ret
 PrintStringAndGetString	endp
 
+
+;--------------------------------------------------------------------
+;Funcao que retorna o local da ocorrencia de uma letra
+;Input:
+;bx -> FileHandle
+;dl -> letra
+;cx -> Numero de vezes a passar pela letra
+;Output:
+;ax -> local da ocorrencia no arquivo
+;--------------------------------------------------------------------
+procLetra	proc	near
+	mov		contador,0
+	cmp		dl,'a'				; Faz um toUpper na letra de entrada para ser comparada com o arquivo
+	jb		procLetra_1			
+	cmp		dl,'z'
+	ja		procLetra_1
+	sub		dl,20h	
+procLetra_1:
+	mov 	LetraAProcurar,dl	; Salva a letra para ser comparada com o arquivo
+	mov 	ax,1				; Posiciona o ponteiro no inicio do arquivo
+
+	call 	getChar				; Não lemos o primeiro caracter do arquivo
+
+loopprocLetra:	
+	inc 	contador
+	call 	getChar				; Le um caractere do arquivo
+	jc		ProbprocLetra		; Se houve erro na leitura do arquivo, retorna com erro
+	cmp		dl,0
+	je		ProbprocLetra		; Se chegou no fim do arquivo, retorna com erro
+
+	cmp		dl,'a'				; Faz um toUpper na letra do arquivo
+	jb		procLetra_2			
+	cmp		dl,'z'
+	ja		procLetra_2
+	sub		dl,20h
+
+procLetra_2:
+	cmp 	dl,LetraAProcurar	; Compara a letra do arquivo com a letra de entrada
+	je 		FimprocLetra		; Se forem iguais, termina a funcao
+	jmp 	loopProcLetra		; Se forem diferentes, continua a leitura do arquivo
+
+ProbprocLetra:
+	mov 	ax,0				; Se houve erro na leitura do arquivo, retorna com erro
+	ret	
+
+FimprocLetra:
+	loop	loopprocLetra		; Se a letra foi encontrada, verifica se é a n-esima ocorrencia
+	mov 	ax,contador			; Se encontrou a letra, retorna o local da ocorrencia
+	ret
+procLetra	endp
+
+;--------------------------------------------------------------------
+;--------------------------------------------------------------------
+ReOpenFileSrc	proc	near
+	push 	bx
+	push 	dx
+	mov		bx,FileHandleSrc	; Fecha arquivo origem
+	call	fclose
+
+	lea		dx,FileNameSrc
+	call	fopen
+	mov		FileHandleSrc,bx
+	pop		dx
+	pop		bx
+	ret
+ReOpenFileSrc	endp
 ;--------------------------------------------------------------------
 		end
 ;--------------------------------------------------------------------
