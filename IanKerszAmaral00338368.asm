@@ -14,18 +14,18 @@ CR		equ		0dh
 LF		equ		0ah
 
 	.data
-FileName		db		256 dup (?)		; Nome do arquivo a ser lido
-FileBuffer		db		10 dup (?)		; Buffer de leitura do arquivo
-FileNameBuffer	db		150 dup (?)
-caractere		db		0
+StringBuffer	db		150 dup (?)
 
+FileName		db		256 dup (?)		; Nome do arquivo a ser lido
 FileNameLength db		1 dup (?)		; Tamanho do nome do arquivo
 
 InputFileName	db		256 dup (?)		; Nome do arquivo de input
 InputFileHandle	dw		0				; Handler do arquivo de input
+InputFileBuffer	db		10 dup (?)		; Buffer de leitura do arquivo
 
 OutputFileName	db		256 dup (?)		; Nome do arquivo de output
 OutputFileHandle dw		0				; Handler do arquivo de output
+OutputFileBuffer db		10 dup (?)		; Buffer de leitura do arquivo
 
 MsgPedeArquivo		db	"Nome do arquivo: ", 0
 MsgErroOpenFile		db	"Erro na abertura do arquivo.", CR, LF, 0
@@ -53,7 +53,9 @@ sw_m	dw	0
     .startup
 
     ;	GetFileName();	// Pega o nome do arquivo e coloca em FileName
-	call	GetFileName
+	lea		bx,MsgPedeArquivo
+	lea		ax,FileName
+	call	PrintStringAndGetString
 
 	;	printf ("\r\n");
 	lea		bx,MsgCRLF
@@ -177,23 +179,26 @@ ContinuaCreateFiles2:
 CreateFileHandles endp
 
 ;--------------------------------------------------------------------
-;Funcao: Le o nome do arquivo do teclado
+;Funcao: Le o nome do arquivo do string do teclado
+; lea		bx,Msg do printf
+; lea		ax,LocaldeOutput
 ;--------------------------------------------------------------------
-GetFileName	proc	near
-		lea		bx,MsgPedeArquivo			; Coloca mensagem que pede o nome do arquivo
+PrintStringAndGetString	proc	near
+		push 	ax
+		;lea		bx,MsgPedeArquivo			; Coloca mensagem que pede o nome do arquivo
 		call	printf_s
 
 		mov		ah,0ah						; Le uma linha do teclado
-		lea		dx,FileNameBuffer
-		mov		byte ptr FileNameBuffer,100
+		lea		dx,StringBuffer
+		mov		byte ptr StringBuffer,100
 		int		21h
 
-		mov		cl,FileNameBuffer+1			; Coloca o tamanho do nome do arquivo em FileNameLength
+		mov		cl,StringBuffer+1			; Coloca o tamanho do nome do arquivo em FileNameLength
 		mov		FileNameLength,cl
 
-		lea		si,FileNameBuffer+2			; Copia do buffer de teclado para o FileName
-		lea		di,FileName
-		mov		cl,FileNameBuffer+1
+		lea		si,StringBuffer+2			; Copia do buffer de teclado para o FileName
+		pop		di
+		mov		cl,StringBuffer+1
 		mov		ch,0
 		mov		ax,ds						; Ajusta ES=DS para poder usar o MOVSB
 		mov		es,ax
@@ -201,7 +206,7 @@ GetFileName	proc	near
 
 		mov		byte ptr es:[di],0			; Coloca marca de fim de string
 		ret
-GetFileName	endp
+PrintStringAndGetString	endp
 
 
 ;====================================================================
