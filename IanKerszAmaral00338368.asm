@@ -114,29 +114,29 @@ Printf_SNL endp
 ModifyNameWithExtension proc near
 
 	; salva a extensao de bx
-		push 	bx
+	push 	bx
 	;	strcpy (InputFileName, FileName)
-		lea		si,FileName			; Copia do buffer de teclado para o FileName
-		mov		di,ax				; Copia do FileName para o InputFileName
-		mov		cl,FileNameLength
-		mov		ch,0
-		mov		ax,ds						; Ajusta ES=DS para poder usar o MOVSB
-		mov		es,ax
-		rep 	movsb
+	lea		si,FileName			; Copia do buffer de teclado para o FileName
+	mov		di,ax				; Copia do FileName para o InputFileName
+	mov		cl,FileNameLength
+	mov		ch,0
+	mov		ax,ds						; Ajusta ES=DS para poder usar o MOVSB
+	mov		es,ax
+	rep 	movsb
 
 	;	strcat (InputFileName, FileExtensionTXT)
 	;   Como o local já está apontando para o endereço correto
-		pop		bx
-		mov    	si,bx
-		mov    	cl,4
-		mov    	ch,0
-		mov    	ax,ds
-		mov    	es,ax
-		rep    	movsb
+	pop		bx
+	mov    	si,bx
+	mov    	cl,4
+	mov    	ch,0
+	mov    	ax,ds
+	mov    	es,ax
+	rep    	movsb
 
-		mov		byte ptr es:[di],0			; Coloca marca de fim de string
+	mov		byte ptr es:[di],0			; Coloca marca de fim de string
 
-		ret
+	ret
 
 ModifyNameWithExtension endp
 
