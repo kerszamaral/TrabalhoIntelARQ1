@@ -87,18 +87,17 @@ PedeFraseCript:
 	lea		bx,CriptoWord
 	call	Printf_SNL
 
-FechaArquivoOutput:
+FechaArquivos:
 	;	fclose(OutputFileHandle->bx)
 	mov		bx,OutputFileHandle
 	call 	fclose
 
-FechaArquivoInput:
 	;	fclose(InputFileHandle->bx)
 	mov		bx,InputFileHandle
 	call 	fclose
 
 Final:
-	.exit
+	.exit	0
 
 
 ;====================================================================
@@ -156,7 +155,7 @@ CreateFileHandles proc 	near
 	lea		bx,MsgErroOpenFile
 	call	printf_s
 	mov		al,1
-	jmp		Final
+	.exit	1
 
 ContinuaCreateFiles1:
 	;	FileHandle = ax
@@ -173,7 +172,9 @@ ContinuaCreateFiles1:
 	lea		bx,MsgErroOpenFile
 	call	printf_s
 	mov		al,1
-	jmp		FechaArquivoInput
+	mov		bx,InputFileHandle
+	call 	fclose
+	.exit	2
 
 ContinuaCreateFiles2:
 		;	FileHandle = ax
