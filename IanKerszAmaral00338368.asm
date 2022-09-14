@@ -46,13 +46,7 @@ LetraAProcurar		db	1 dup (?)		; Letra a ser procurada
 
 Letterbuffer		db	10 dup (?)		; Buffer para leitura de letras
 
-contador			dw	1 dup (?)	; Contador de letras
-UsedLocationsSize	dw	1	dup (?)
 UsedLocations		dw	156 dup (?)		; Vetor de localizacoes ja usadas, bem maior do que as 100 necessarias por agr
-
-SaveLetra			db	1 dup (?)		; Letra a ser salva
-OcorrenciaLetra		dw	1 dup (?)		; Ocorrencia da letra
-
 
 MAXSTRING	equ		196		; Tamanho maximo da string - 4 para extensoes
 String	db		MAXSTRING dup (?)		; Usado na funcao gets
@@ -68,7 +62,6 @@ sw_m	dw	0
 	.code
 	.startup
 
-	mov	UsedLocations,0
 	;GetFileName();	// Pega o nome do arquivo de origem -> FileNameSrc
 	lea		bx,MsgPedeArquivo
 	lea		ax,FileName
@@ -121,14 +114,14 @@ PegaFraseCripto:
 	lea 	ax,CriptoWord
 	call 	PrintStringAndGetString
 
-	;Setup end location of string
+	;Setup location of string
 	lea		bx,CriptoWord	; bx = CriptoWord
 	mov		di,0			; di = CriptoLocation
 	push	bx				; 	salva o ponteiro
 	push	di				;	salva o indice
 
 NextCharInCrypto:
-	call	ReOpenFileSrc
+	call	ResetFileSrc
 	pop		bx
 	pop		di
 	mov		al,[bx+di]	; 	Get char
@@ -137,13 +130,47 @@ NextCharInCrypto:
 	push	di			;	salva o indice
 
 	cmp		al,0
-	je		TerminouArquivo ;String terminada
+	je		TerminouCriptoString ;String terminada
 
 	cmp		al,'!'
 	jb		NextCharInCrypto
-	cmp		al,'~'	
+	cmp		al,'~'
 	ja		NextCharInCrypto
+	mov		LetraAProcurar,al
+	mov		cx,0
 	jmp 	Procurar	; 	Se for um char valido, procura a letra
+
+Procurar:
+	mov		dl,LetraAProcurar
+	mov		bx,FileHandleSrc
+	
+	call 	SearchCharInFile
+	mov		di,0
+
+Revisar:
+	mov		ax,[UsedLocations+di]
+	cmp		ax,0
+	je		ColocaVetor
+	cmp		cx,ax
+	je		Procurar
+	add		di,2
+	jmp		Revisar
+
+ColocaVetor:
+	mov		[UsedLocations+di],cx
+	jmp		NextCharInCrypto
+
+TerminouCriptoString:
+	mov		di,0
+	mov		bx,FileHandleDst
+
+TerminouCriptoStringLoop:
+	mov		cx,[UsedLocations+di]
+	cmp		cx,0
+	je		TerminouArquivo
+	call	NumToFile
+	add		di,2
+	jmp		TerminouCriptoStringLoop
 
 TerminouArquivo:
 	;fclose(FileHandleSrc)
@@ -154,81 +181,6 @@ TerminouArquivo:
 	mov		bx,FileHandleDst	; Fecha arquivo destino
 	call	fclose
 	.exit	0
-
-ProcurarNext:
-	mov		al,SaveLetra
-	inc		OcorrenciaLetra
-	mov		SaveLetra,al
-	mov		dl,al
-	mov		bx,FileHandleSrc
-	mov		cx,OcorrenciaLetra
-	
-	call 	procLetra
-	mov		cx,ax
-	mov		di,0
-
-Procurar:
-	mov		SaveLetra,al
-	mov		OcorrenciaLetra,1
-	mov		dl,al
-	mov		bx,FileHandleSrc
-	mov		cx,OcorrenciaLetra
-	
-	call 	procLetra
-	mov		cx,ax
-	mov		di,0
-
-Revisar:
-	mov		ax,[UsedLocations+di]
-	cmp		cx,ax
-	je		ProcurarNext
-	inc		di
-	cmp		UsedLocationsSize,di
-	jae		Revisar
-	mov		UsedLocationsSize,di
-	mov		ax,2
-	mul		di
-	mov		di,ax
-	mov		[UsedLocations+di],cx
-
-Escreve:
-	mov		bx,FileHandleDst
-	cmp		cx,1000
-	ja		mil
-	mov		dl,'0'
-	call 	setChar
-mil:
-	cmp		cx,100
-	ja		cent
-	mov		dl,'0'
-	call 	setChar
-cent:
-	cmp		cx,10
-	ja		dez
-	mov		dl,'0'
-	call 	setChar
-dez:
-	lea		bx,Letterbuffer
-	mov		ax,cx
-	call 	sprintf_w
-	lea		bx,Letterbuffer
-
-LoopPrintString:
-	mov		dl,[bx]
-	cmp 	dl,0
-	je		FimPrintString
-	push	bx
-	mov		bx,FileHandleDst
-	call	setChar
-	pop		bx
-	inc		bx
-	jmp		LoopPrintString
-	
-FimPrintString:
-	mov		bx,FileHandleDst
-	mov		dl,' '
-	call 	setChar
-	jmp 	NextCharInCrypto
 
 ;===============================================================================
 ;	Subrotinas
@@ -282,11 +234,13 @@ fclose	endp
 ;		CF -> "0" se leitura ok
 ;--------------------------------------------------------------------
 getChar	proc	near
+	push	cx
 	mov		ah,3fh
 	mov		cx,1
 	lea		dx,FileBuffer
 	int		21h
 	mov		dl,FileBuffer
+	pop		cx
 	ret
 getChar	endp
 		
@@ -297,11 +251,13 @@ getChar	endp
 ;		CF -> "0" se escrita ok
 ;--------------------------------------------------------------------
 setChar	proc	near
+	push	cx
 	mov		ah,40h
 	mov		cx,1
 	mov		FileBuffer,dl
 	lea		dx,FileBuffer
 	int		21h
+	pop		cx
 	ret
 setChar	endp	
 
@@ -493,73 +449,128 @@ PrintStringAndGetString	endp
 ;Input:
 ;bx -> FileHandle
 ;dl -> letra
-;cx -> Numero de vezes a passar pela letra
 ;Output:
-;ax -> local da ocorrencia no arquivo
+;cx -> local da ocorrencia no arquivo
 ;--------------------------------------------------------------------
-procLetra	proc	near
-	mov		contador,0
+SearchCharInFile	proc	near
 	cmp		dl,'a'				; Faz um toUpper na letra de entrada para ser comparada com o arquivo
-	jb		procLetra_1			
+	jb		SearchCharInFile_1			
 	cmp		dl,'z'
-	ja		procLetra_1
+	ja		SearchCharInFile_1
 	sub		dl,20h	
-procLetra_1:
+
+SearchCharInFile_1:
 	mov 	LetraAProcurar,dl	; Salva a letra para ser comparada com o arquivo
-	mov 	ax,1				; Posiciona o ponteiro no inicio do arquivo
+	mov 	ax,1				; Posiciona o numero de caracteres a serem lidos
 
-	call 	getChar				; Não lemos o primeiro caracter do arquivo
-
-loopprocLetra:	
-	inc 	contador
+loopSearchCharInFile:	
+	inc 	cx
 	call 	getChar				; Le um caractere do arquivo
-	jc		ProbprocLetra		; Se houve erro na leitura do arquivo, retorna com erro
+	jc		SearchCharInFile_Error		; Se houve erro na leitura do arquivo, retorna com erro
 	cmp		dl,0
-	je		ProbprocLetra		; Se chegou no fim do arquivo, retorna com erro
+	je		SearchCharInFile_Error		; Se chegou no fim do arquivo, retorna com erro
 
 	cmp		dl,'a'				; Faz um toUpper na letra do arquivo
-	jb		procLetra_2			
+	jb		SearchCharInFile_2			
 	cmp		dl,'z'
-	ja		procLetra_2
+	ja		SearchCharInFile_2
 	sub		dl,20h
 
-procLetra_2:
+SearchCharInFile_2:
 	cmp 	dl,LetraAProcurar	; Compara a letra do arquivo com a letra de entrada
-	je 		FimprocLetra		; Se forem iguais, termina a funcao
-	jmp 	loopProcLetra		; Se forem diferentes, continua a leitura do arquivo
+	je 		FimSearchCharInFile		; Se forem iguais, termina a funcao
+	jmp 	loopSearchCharInFile		; Se forem diferentes, continua a leitura do arquivo
 
-ProbprocLetra:
-	mov 	ax,0				; Se houve erro na leitura do arquivo, retorna com erro
+SearchCharInFile_Error:
+	mov 	cx,0				; Se houve erro na leitura do arquivo, retorna com erro
 	ret	
 
-FimprocLetra:
-	loop	loopprocLetra		; Se a letra foi encontrada, verifica se é a n-esima ocorrencia
-	mov 	ax,contador			; Se encontrou a letra, retorna o local da ocorrencia
+FimSearchCharInFile:
 	ret
-procLetra	endp
+
+SearchCharInFile	endp
 
 ;--------------------------------------------------------------------
+;Coloca o arquivo lido no local correto para a leitura
 ;--------------------------------------------------------------------
-ReOpenFileSrc	proc	near
-	push 	bx
+ResetFileSrc	proc	near
+	; Salva os registradores usados
+	push 	ax
+	push	bx
+	push	cx
 	push 	dx
-	mov		bx,FileHandleSrc	; Fecha arquivo origem
-	call	fclose
 
-	lea		dx,FileNameSrc
-	call	fopen
-	mov		FileHandleSrc,bx
-	pop		dx
-	pop		bx
+	mov		ah,42h				; Funcao Set File Pointer
+	mov 	al,0				; Posiciona o ponteiro no inicio do arquivo (Seek_Set)
+	mov		bx,FileHandleSrc	; Pega o Handle do arquivo desejado
+	mov		dx,1				; Pega o offset do arquivo desejado (parte menor), começamos pela segunda posição
+	mov		cx,0				; Pega o offset do arquivo desejado (parte maior)
+
+	int		21h					; interrupt de arquivo
+	jc		ResetFileSrc_error
+
+	; Recupera os registradores usados
+	pop 	dx
+	pop 	cx
+	pop 	bx
+	pop		ax
 	ret
-ReOpenFileSrc	endp
+
+ResetFileSrc_error:
+	mov		bx,FileHandleSrc
+	call	fclose
+	mov		bx,FileHandleDst
+	call	fclose
+	.exit 1
+
+ResetFileSrc	endp
+
+;--------------------------------------------------------------------
+;Escreve o numero vindo em cx no arquivo
+;--------------------------------------------------------------------
+NumToFile	proc	near
+
+	push	di
+	cmp		cx,1000
+	jae		cent
+	mov		dl,'0'
+	call 	setChar
+
+cent:
+	cmp		cx,100
+	jae		dez
+	mov		dl,'0'
+	call 	setChar
+
+dez:
+	cmp		cx,10
+	ja		escreve
+	mov		dl,'0'
+	call 	setChar
+
+escreve:
+	lea		bx,Letterbuffer
+	mov		ax,cx
+	call 	sprintf_w
+	mov		di,0
+
+LoopPrintString:
+	mov		dl,[Letterbuffer+di]
+	cmp 	dl,0
+	je		FimPrintString
+	mov		bx,FileHandleDst
+	call	setChar
+	inc		di
+	jmp		LoopPrintString
+	
+FimPrintString:
+	mov		bx,FileHandleDst
+	mov		dl,' '
+	call 	setChar
+	pop		di
+	
+	ret
+NumToFile	endp
 ;--------------------------------------------------------------------
 		end
 ;--------------------------------------------------------------------
-
-
-	
-
-
-
-
