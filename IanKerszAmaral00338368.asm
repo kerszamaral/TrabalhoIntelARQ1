@@ -25,7 +25,7 @@ FileHandleDst	dw		0				; Handler do arquivo destino
 
 FileBuffer		db		10 dup (?)		; Buffer de leitura/escrita do arquivo
 
-CriptoWord		db		256 dup (?)		; Frase a ser criptografada
+CriptoWord		db		100 dup (?)		; Frase a ser criptografada
 
 MsgPedeCripto		db	"Frase a ser criptografada: ", 0
 MsgPedeArquivo		db	"Nome do arquivo: ", 0
@@ -42,7 +42,7 @@ LetraAProcurar		db	1 dup (?)		; Letra a ser procurada
 
 Letterbuffer		db	10 dup (?)		; Buffer para leitura de letras
 
-UsedLocations		dw	156 dup (?)		; Vetor de localizacoes ja usadas, bem maior do que as 100 necessarias por agr
+CriptoLocations		dw	100 dup (?)		; Vetor de localizacoes ja usadas
 
 AEOFStore			dw	0				; Armazena o valor usado em AEOF
 AEOFStore1			dw	0				; Armazena o valor usado em AEOF
@@ -114,7 +114,7 @@ Procurar:
 	mov		di,0
 
 Revisar:
-	mov		ax,[UsedLocations+di]
+	mov		ax,[CriptoLocations+di]
 	cmp		ax,0
 	je		ColocaVetor
 	cmp		cx,ax
@@ -123,7 +123,7 @@ Revisar:
 	jmp		Revisar
 
 ColocaVetor:
-	mov		[UsedLocations+di],cx
+	mov		[CriptoLocations+di],cx
 	jmp		NextCharInCrypto
 
 TerminouCriptoString:
@@ -131,7 +131,7 @@ TerminouCriptoString:
 	mov		bx,FileHandleDst
 
 TerminouCriptoStringLoop:
-	mov		cx,[UsedLocations+di]
+	mov		cx,[CriptoLocations+di]
 	cmp		cx,0
 	je		TerminouArquivo
 	call	NumToFile
