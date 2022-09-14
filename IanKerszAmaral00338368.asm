@@ -48,7 +48,7 @@ Letterbuffer		db	10 dup (?)		; Buffer para leitura de letras
 
 UsedLocations		dw	156 dup (?)		; Vetor de localizacoes ja usadas, bem maior do que as 100 necessarias por agr
 
-HexTable			db  "0123456789abcdef"
+HexTable			db  "0123456789ABCDEF"
 
 MAXSTRING	equ		196		; Tamanho maximo da string - 4 para extensoes
 String	db		MAXSTRING dup (?)		; Usado na funcao gets
@@ -170,23 +170,10 @@ TerminouCriptoString:
 TerminouCriptoStringLoop:
 	mov		cx,[UsedLocations+di]
 	cmp		cx,0
-	je		testHex
+	je		TerminouArquivo
 	call	NumToFile
 	add		di,2
 	jmp		TerminouCriptoStringLoop
-
-testHex:
-	mov		di,0
-	lea		bx,testbuffer
-	
-testHexLoop:
-	mov		cx,[UsedLocations+di]
-	cmp		cx,0
-	je		TerminouArquivo
-	mov		ax,cx
-	call	HexToString
-	add		di,2
-	jmp		testHexLoop
 
 TerminouArquivo:
 	;fclose(FileHandleSrc)
@@ -546,28 +533,15 @@ ResetFileSrc	endp
 ;--------------------------------------------------------------------
 NumToFile	proc	near
 
+	push	ax
+	push	bx
+	push	dx
 	push	di
-	cmp		cx,1000
-	jae		cent
-	mov		dl,'0'
-	call 	setChar
 
-cent:
-	cmp		cx,100
-	jae		dez
-	mov		dl,'0'
-	call 	setChar
-
-dez:
-	cmp		cx,10
-	ja		escreve
-	mov		dl,'0'
-	call 	setChar
-
-escreve:
 	lea		bx,Letterbuffer
 	mov		ax,cx
-	call 	sprintf_w
+	call	HexToString
+
 	mov		di,0
 
 LoopPrintString:
@@ -583,7 +557,11 @@ FimPrintString:
 	mov		bx,FileHandleDst
 	mov		dl,' '
 	call 	setChar
+	
 	pop		di
+	pop		dx
+	pop		bx
+	pop		ax
 	
 	ret
 NumToFile	endp
