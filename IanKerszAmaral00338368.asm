@@ -48,8 +48,11 @@ Letterbuffer		db	10 dup (?)		; Buffer para leitura de letras
 
 UsedLocations		dw	156 dup (?)		; Vetor de localizacoes ja usadas, bem maior do que as 100 necessarias por agr
 
+HexTable			db  "0123456789abcdef"
+
 MAXSTRING	equ		196		; Tamanho maximo da string - 4 para extensoes
 String	db		MAXSTRING dup (?)		; Usado na funcao gets
+testbuffer	db	256 dup (?)		; Buffer para testes
 
 ; Vari�vel interna usada na rotina printf_w
 BufferWRWORD	db		10 dup (?)
@@ -167,10 +170,23 @@ TerminouCriptoString:
 TerminouCriptoStringLoop:
 	mov		cx,[UsedLocations+di]
 	cmp		cx,0
-	je		TerminouArquivo
+	je		testHex
 	call	NumToFile
 	add		di,2
 	jmp		TerminouCriptoStringLoop
+
+testHex:
+	mov		di,0
+	lea		bx,testbuffer
+	
+testHexLoop:
+	mov		cx,[UsedLocations+di]
+	cmp		cx,0
+	je		TerminouArquivo
+	mov		ax,cx
+	call	HexToString
+	add		di,2
+	jmp		testHexLoop
 
 TerminouArquivo:
 	;fclose(FileHandleSrc)
@@ -571,6 +587,49 @@ FimPrintString:
 	
 	ret
 NumToFile	endp
+
+;--------------------------------------------------------------------
+;Fun��o: Converte um inteiro (n) para (string) como hexadecimal
+;		 sprintf(string->BX, "%d", n->AX)
+;--------------------------------------------------------------------
+HexToString proc near
+
+	push 	ax
+	push	cx
+	push 	di
+
+	mov		dx,ax
+	mov		ch,4
+	mov		cl,12
+	mov		di,0
+
+ByteLoop:
+	shr		ax,cl
+	and		ax,000Fh
+
+	push	di
+	mov		di,ax
+
+	mov		al,[HexTable+di]
+	pop		di
+	mov		[bx+di],al
+
+	sub		cl,4
+	mov		ax,dx
+	inc		di
+
+	dec		ch
+	jnz		ByteLoop
+
+	mov		[bx+di],0
+	
+	pop		di
+	pop		cx
+	pop		ax
+
+	ret
+
+HexToString endp
 ;--------------------------------------------------------------------
 		end
 ;--------------------------------------------------------------------
