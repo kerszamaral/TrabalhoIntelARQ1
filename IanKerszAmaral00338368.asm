@@ -48,19 +48,7 @@ Letterbuffer		db	10 dup (?)		; Buffer para leitura de letras
 
 UsedLocations		dw	156 dup (?)		; Vetor de localizacoes ja usadas, bem maior do que as 100 necessarias por agr
 
-HexTable			db  "0123456789ABCDEF"
-
-MAXSTRING	equ		196		; Tamanho maximo da string - 4 para extensoes
-String	db		MAXSTRING dup (?)		; Usado na funcao gets
-testbuffer	db	256 dup (?)		; Buffer para testes
-
-; Vari�vel interna usada na rotina printf_w
-BufferWRWORD	db		10 dup (?)
-
-; Variaveis para uso interno na fun��o sprintf_w
-sw_n	dw	0
-sw_f	db	0
-sw_m	dw	0
+HexTable			db  "0123456789ABCDEF",0
 
 	.code
 	.startup
@@ -262,32 +250,7 @@ setChar	proc	near
 	int		21h
 	pop		cx
 	ret
-setChar	endp	
-
-;
-;--------------------------------------------------------------------
-;Funcao Le um string do teclado e coloca no buffer apontado por BX
-;		gets(char *s -> bx)
-;--------------------------------------------------------------------
-gets	proc	near
-	push	bx
-
-	mov		ah,0ah						; L� uma linha do teclado
-	lea		dx,String
-	mov		byte ptr String, MAXSTRING-4	; 2 caracteres no inicio e um eventual CR LF no final
-	int		21h
-
-	lea		si,String+2					; Copia do buffer de teclado para o FileName
-	pop		di
-	mov		cl,String+1
-	mov		ch,0
-	mov		ax,ds						; Ajusta ES=DS para poder usar o MOVSB
-	mov		es,ax
-	rep 	movsb
-
-	mov		byte ptr es:[di],0			; Coloca marca de fim de string
-	ret
-gets	endp
+setChar	endp
 
 ;====================================================================
 ; A partir daqui, est�o as fun��es j� desenvolvidas
@@ -314,71 +277,6 @@ printf_s	proc	near
 ps_1:
 	ret
 printf_s	endp
-
-
-;--------------------------------------------------------------------
-;Fun��o: Escreve o valor de AX na tela
-;		printf("%
-;--------------------------------------------------------------------
-printf_w	proc	near
-	; sprintf_w(AX, BufferWRWORD)
-	lea		bx,BufferWRWORD
-	call	sprintf_w
-	
-	; printf_s(BufferWRWORD)
-	lea		bx,BufferWRWORD
-	call	printf_s
-	
-	ret
-printf_w	endp
-;--------------------------------------------------------------------
-;Fun��o: Converte um inteiro (n) para (string)
-;		 sprintf(string->BX, "%d", n->AX)
-;--------------------------------------------------------------------
-sprintf_w	proc	near
-	mov		sw_n,ax
-	mov		cx,5
-	mov		sw_m,10000
-	mov		sw_f,0
-	
-sw_do:
-	mov		dx,0
-	mov		ax,sw_n
-	div		sw_m
-	
-	cmp		al,0
-	jne		sw_store
-	cmp		sw_f,0
-	je		sw_continue
-sw_store:
-	add		al,'0'
-	mov		[bx],al
-	inc		bx
-	
-	mov		sw_f,1
-sw_continue:
-	
-	mov		sw_n,dx
-	
-	mov		dx,0
-	mov		ax,sw_m
-	mov		bp,10
-	div		bp
-	mov		sw_m,ax
-	
-	dec		cx
-	cmp		cx,0
-	jnz		sw_do
-
-	cmp		sw_f,0
-	jnz		sw_continua2
-	mov		[bx],'0'
-	inc		bx
-sw_continua2:
-
-	mov		byte ptr[bx],0
-	ret		
-sprintf_w	endp
 
 ;----------------------------------------------------------------------
 ; strcat(char *s1 -> ax, char *s2 -> bx)
@@ -599,7 +497,7 @@ ByteLoop:
 	dec		ch
 	jnz		ByteLoop
 
-	mov		[bx+di],0
+	mov		[bx+di],ch
 	
 	pop		di
 	pop		cx
