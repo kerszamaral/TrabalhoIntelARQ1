@@ -19,12 +19,8 @@ LF		equ		0ah
 StringBuffer	db		150 dup (?)		; buffer para leitura de strings
 
 FileName		db		256 dup (?)		; Nome do arquivo a ser lido
-FileNameLength db		1 dup (?)		; Tamanho do nome do arquivo
 
-FileNameSrc		db		256 dup (?)		; Nome do arquivo a ser lido com ext
 FileHandleSrc	dw		0				; Handler do arquivo origem
-
-FileNameDst		db		256 dup (?)		; Nome do arquivo a ser escrito com ext
 FileHandleDst	dw		0				; Handler do arquivo destino
 
 FileBuffer		db		10 dup (?)		; Buffer de leitura/escrita do arquivo
@@ -48,6 +44,9 @@ Letterbuffer		db	10 dup (?)		; Buffer para leitura de letras
 
 UsedLocations		dw	156 dup (?)		; Vetor de localizacoes ja usadas, bem maior do que as 100 necessarias por agr
 
+AEOFStore			dw	0				; Armazena o valor usado em AEOF
+AEOFStore1			dw	0				; Armazena o valor usado em AEOF
+
 HexTable			db  "0123456789ABCDEF",0
 
 	.code
@@ -58,47 +57,23 @@ HexTable			db  "0123456789ABCDEF",0
 	lea		ax,FileName
 	call	PrintStringAndGetString
 
-ModificaNomes:
-	lea		ax,FileNameSrc
-	lea		bx,FileExtensionTXT
-	call	ModifyNameWithExtension
+;ax -> local de saida do handler	
+;bx -> ponteiro para o string do nome do arquivo
+;cx -> extensao do string
+;dx -> Tipo de abertura do arquivo
 
-	lea		ax,FileNameDst
-	lea		bx,FileExtensionKRP
-	call	ModifyNameWithExtension
+CriaHandles:
+	lea		ax,FileHandleSrc
+	lea		bx,FileName
+	lea		cx,FileExtensionTXT
+	mov		dx,0
+	call	AddExtensionAndOpenFile
 
-
-	; Abre o arquivo de origem
-	;if (fopen(FileNameSrc)) {
-	;	printf("Erro na abertura do arquivo.\r\n")
-	;	exit(1)
-	;}
-	;FileHandleSrc = BX
-	lea		dx,FileNameSrc
-	call	fopen
-	mov		FileHandleSrc,bx
-	jnc		Continua1
-	lea		bx, MsgErroOpenFile
-	call	printf_s
-	.exit	1
-
-Continua1:
-	
-	;if (fcreate(FileNameDst)) {
-	;	fclose(FileHandleSrc);
-	;	printf("Erro na criacao do arquivo.\r\n")
-	;	exit(1)
-	;}
-	;FileHandleDst = BX
-	lea		dx,FileNameDst
-	call	fcreate
-	mov		FileHandleDst,bx
-	jnc		PegaFraseCripto
-	mov		bx,FileHandleSrc
-	call	fclose
-	lea		bx, MsgErroCreateFile
-	call	printf_s
-	.exit	1
+	lea		ax,FileHandleDst
+	lea		bx,FileName
+	lea		cx,FileExtensionKRP
+	mov		dx,42h
+	call	AddExtensionAndOpenFile
 
 PegaFraseCripto:
 	lea		bx,MsgPedeCripto
@@ -279,37 +254,110 @@ ps_1:
 printf_s	endp
 
 ;----------------------------------------------------------------------
-; strcat(char *s1 -> ax, char *s2 -> bx)
-; Pega a extensao salva em bx, pega o nome do arquivo e coloca na string apontada por ax
+;ax -> local de saida do handler	
+;bx -> ponteiro para o string do nome do arquivo
+;cx -> extensao do string
+;dx -> Tipo de abertura do arquivo 0 para open e qualquer outra coisa para create
 ;----------------------------------------------------------------------
-ModifyNameWithExtension proc near
+AddExtensionAndOpenFile proc near
 
-	; salva a extensao de bx
-	push 	bx
-	;	strcpy (InputFileName, FileName)
-	lea		si,FileName			; Copia do buffer de teclado para o FileName
-	mov		di,ax				; Copia do FileName para o InputFileName
-	mov		cl,FileNameLength
-	mov		ch,0
-	mov		ax,ds						; Ajusta ES=DS para poder usar o MOVSB
-	mov		es,ax
-	rep 	movsb
+	push	ax
+	push	dx
 
-	;	strcat (InputFileName, FileExtensionTXT)
-	;   Como o local já está apontando para o endereço correto
+	call	Strlen
+
+	mov		AEOFStore,di
+	mov		di,0
+	mov		AEOFStore1,di
+
+AEOF_1Loop:
+	push	bx
+
+	mov		di,AEOFStore1
+	mov		bx,cx
+	mov		al,[bx+di]
+	inc		di
+	mov		AEOFStore1,di
+	
 	pop		bx
-	mov    	si,bx
-	mov    	cl,4
-	mov    	ch,0
-	mov    	ax,ds
-	mov    	es,ax
-	rep    	movsb
+	mov		di,AEOFStore
+	inc		di
+	mov		AEOFStore,di
 
-	mov		byte ptr es:[di],0			; Coloca marca de fim de string
+	cmp		al,0
+	je		AEOF_2
+
+	mov		[bx+di],al
+	jmp		AEOF_1Loop
+
+AEOF_2:
+	mov		[bx+di],dl			;Temos o nome do arquivo com a extensao, adicionamos o 0 para finalizar
+	
+	pop		dx
+
+	cmp		dx,0
+	je		AEOF_open
+
+	mov		dx,bx
+	call	fcreate
+	mov		cx,bx
+	pop		ax
+	mov		bx,ax
+	mov		[bx],cx
+	jnc		AEOF_Cleanup
+	lea		bx, MsgErroCreateFile
+	call	printf_s
+	call	FileErrorHandler
+	
+AEOF_open:
+	mov		dx,bx
+	call	fopen
+	mov		cx,bx
+	pop		ax
+	mov		bx,ax
+	mov		[bx],cx
+	jnc		AEOF_Cleanup
+	lea		bx, MsgErroOpenFile
+	call	printf_s
+	call	FileErrorHandler
+
+AEOF_Cleanup:
+	mov		bx,dx
+	call	Strlen
+	mov		cx,4
+	mov		al,0
+
+AEOF_CleanupLoop:
+	mov		[bx+di],al
+	dec		di
+	loop	AEOF_CleanupLoop
 
 	ret
 
-ModifyNameWithExtension endp
+AddExtensionAndOpenFile endp
+
+;----------------------------------------------------------------------
+;Entrada: bx -> ponteiro para o string
+;Saida: di -> tamanho da string
+;----------------------------------------------------------------------
+Strlen proc near
+
+	push	dx
+	mov		dl,0
+	mov		di,0
+
+StrlenLoop:
+	cmp		[bx+di],dl
+	je		StrlenENd
+	inc		di
+	jmp		StrlenLoop
+
+StrlenEnd:
+	dec		di
+	pop		dx
+	ret
+
+Strlen endp
 
 ;--------------------------------------------------------------------
 ;Funcao: Le o nome do arquivo do string do teclado
@@ -324,9 +372,6 @@ PrintStringAndGetString	proc	near
 	lea		dx,StringBuffer
 	mov		byte ptr StringBuffer,100
 	int		21h
-
-	mov		cl,StringBuffer+1			; Coloca o tamanho do nome do arquivo em FileNameLength
-	mov		FileNameLength,cl
 
 	lea		si,StringBuffer+2			; Copia do buffer de teclado para o FileName
 	pop		di
@@ -418,11 +463,7 @@ ResetFileSrc	proc	near
 	ret
 
 ResetFileSrc_error:
-	mov		bx,FileHandleSrc
-	call	fclose
-	mov		bx,FileHandleDst
-	call	fclose
-	.exit 1
+	call	FileErrorHandler
 
 ResetFileSrc	endp
 
@@ -506,6 +547,24 @@ ByteLoop:
 	ret
 
 HexToString endp
+
+FileErrorHandler	proc	near
+
+	mov		bx,FileHandleSrc
+	cmp		bx,0
+	je		FileErrorHandler_1
+	call	fclose
+
+FileErrorHandler_1:
+	mov		bx,FileHandleDst
+	cmp		bx,0
+	je		FileErrorHandler_2
+	call	fclose
+
+FileErrorHandler_2:
+	.exit 1
+
+FileErrorHandler	endp
 ;--------------------------------------------------------------------
 		end
 ;--------------------------------------------------------------------
