@@ -1,4 +1,4 @@
-;Abacate
+;aquina de alan turing
 ; Ian Kersz Amaral - Cartão: 00338368
 ;
 ;====================================================================
