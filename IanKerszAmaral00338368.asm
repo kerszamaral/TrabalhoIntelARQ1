@@ -269,10 +269,12 @@ AEOFOpen:
 	mov		cx,bx			; Carrega o Handle do arquivo no cx
 	pop		bx				; Carrega o ponteiro para o local do handler no bx
 	mov		[bx],cx			; Coloca o handle no local de saida
-	call	CheckFileSize	; Chama a funcao para verificar o tamanho do arquivo
-	jnc		AEOFCleanup		; Se nao houve erro, pula para a funcao de limpeza
+	jnc		AEOFCleanupOpen	; Se nao houve erro, pula para a funcao de limpeza
 	lea		bx, MsgErrorOF	; Carrega o ponteiro para a mensagem de erro
 	call	FileErrorHdlr	; Chama a funcao para tratar o erro
+
+AEOFCleanupOpen:
+	call	CheckFileSize	; Chama a funcao para verificar o tamanho do arquivo
 
 AEOFCleanup:
 	mov		bx,dx			; Carrega o ponteiro para o nome do arquivo no bx
