@@ -61,7 +61,6 @@ MsgErrorFTS		db	"Error: Simbolo nao encontrado.", CR, LF, 0		; Mensagem de erro 
 MSgErrorFTL		db	"Error: Arquivo muito grande.", CR, LF, 0		; Mensagem de erro arquivo de tamanho excessivo
 MsgErrorSOF		db	"Error: Frase muito grande.", CR, LF, 0			; Mensagem de erro frase muito grande
 MsgErrorSE		db	"Error: Frase vazia.", CR, LF, 0				; Mensagem de erro frase nao pode ser vazia
-MsgErrorSIC		db	"Error: Caracteres invalidos.", CR, LF, 0		; Mensagem de erro frase com caracteres invalidos
 MsgDoneFS		db	"Tamanho do arquivo de entrada (em bytes): ", 0	; Mensagem de tamanho do arquivo
 MsgDoneSSize	db	"Tamanho da frase (em bytes): ", 0				; Mensagem de tamanho da frase
 MsgDoneFN		db	"Nome do arquivo de saida: ", 0					; Mensagem de nome do arquivo de saida
@@ -149,10 +148,6 @@ SetVetor:
 	mov		[SenLocVec+di],cx	; Coloca a localizacao no vetor de localizacoes
 	jmp		NextCharInCrypto	; Pula para o proximo caractere da frase a ser criptografada
 
-CryptoStringInvalid:
-	lea		bx,MsgErrorSIC
-	call	FileErrorHdlr
-
 EndCryptoString:
 	mov		bx,FileHandle		; Fecha arquivo origem, ele nao sera mais usado
 	call	fclose				
@@ -183,7 +178,6 @@ MainEnd:
 	lea		bx,MsgDoneFS		; Carrega o endereco da mensagem de sucesso
 	call	printf_s			; Chama a funcao para imprimir a mensagem de sucesso
 	mov		ax,FileSize			; Carrega o tamanho do arquivo
-	dec		ax					; Decrementa o tamanho do arquivo para o tamanho real
 	call	printf_w			; Chama a funcao para imprimir o tamanho do arquivo
 	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
 	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
@@ -554,9 +548,11 @@ CheckFileSize	proc	near
 	push 	dx					; Salva o dx
 	pushf
 	
+	mov		bx,FileHandle		; Carrega o FileHandle
+	mov		dx,1				; Coloca 1 no dx, offset do arquivo
+	call	ResetFile 			; Chama a funcao para resetar o arquivo
 	mov		cx,0				; Coloca 0 no cx
 	push	cx					; Salva o cx
-	mov		bx,FileHandle		; Carrega o FileHandle
 	
 
 CheckFileSizeLoop:
