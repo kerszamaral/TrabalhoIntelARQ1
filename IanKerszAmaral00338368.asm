@@ -50,26 +50,26 @@ sw_m			dw	0						; Variavel para uso interno na funcao sprintf_w
 ;----------------------------------------------------------------------
 ;	Mensagens
 ;----------------------------------------------------------------------
-AskForFile		db	"Nome do arquivo: ", 0						; Mensagem para pedir o nome do arquivo
-AskForSentence	db	"Frase a ser criptografada: ", 0			; Mensagem para pedir a frase a ser criptografada
-MsgErrorOF		db	"Error: Abrir o arquivo.", CR, LF, 0		; Mensagem de erro ao abrir o arquivo
-MsgErrorCF		db	"Error: Criar o arquivo.", CR, LF, 0		; Mensagem de erro ao criar o arquivo
-MsgErrorRF		db	"Error: Leitura do arquivo.", CR, LF, 0		; Mensagem de erro ao ler o arquivo
-MsgErrorWF		db	"Error: Escrita do arquivo.", CR, LF, 0		; Mensagem de erro ao escrever no arquivo
-MsgErrorRSF		db	"Error: Reiniciar o arquivo.", CR, LF, 0	; Mensagem de erro ao resetar o arquivo
-MsgErrorFTS		db	"Error: Simbolo nao encontrado.", CR, LF, 0	; Mensagem de erro arquivo de tamanho insuficiente
-MSgErrorFTL		db	"Error: Arquivo muito grande.", CR, LF, 0	; Mensagem de erro arquivo de tamanho excessivo
-MsgErrorSOF		db	"Error: Frase muito grande.", CR, LF, 0		; Mensagem de erro frase muito grande
-MsgErrorSE		db	"Error: Frase vazia.", CR, LF, 0			; Mensagem de erro frase nao pode ser vazia
-MsgErrorSIC		db	"Error: Caracteres invalidos.", CR, LF, 0	; Mensagem de erro frase com caracteres invalidos
+AskForFile		db	"Nome do arquivo: ", 0							; Mensagem para pedir o nome do arquivo
+AskForSentence	db	"Frase a ser criptografada: ", 0				; Mensagem para pedir a frase a ser criptografada
+MsgErrorOF		db	"Error: Abrir o arquivo.", CR, LF, 0			; Mensagem de erro ao abrir o arquivo
+MsgErrorCF		db	"Error: Criar o arquivo.", CR, LF, 0			; Mensagem de erro ao criar o arquivo
+MsgErrorRF		db	"Error: Leitura do arquivo.", CR, LF, 0			; Mensagem de erro ao ler o arquivo
+MsgErrorWF		db	"Error: Escrita do arquivo.", CR, LF, 0			; Mensagem de erro ao escrever no arquivo
+MsgErrorRSF		db	"Error: Reiniciar o arquivo.", CR, LF, 0		; Mensagem de erro ao resetar o arquivo
+MsgErrorFTS		db	"Error: Simbolo nao encontrado.", CR, LF, 0		; Mensagem de erro arquivo de tamanho insuficiente
+MSgErrorFTL		db	"Error: Arquivo muito grande.", CR, LF, 0		; Mensagem de erro arquivo de tamanho excessivo
+MsgErrorSOF		db	"Error: Frase muito grande.", CR, LF, 0			; Mensagem de erro frase muito grande
+MsgErrorSE		db	"Error: Frase vazia.", CR, LF, 0				; Mensagem de erro frase nao pode ser vazia
+MsgErrorSIC		db	"Error: Caracteres invalidos.", CR, LF, 0		; Mensagem de erro frase com caracteres invalidos
 MsgDoneFS		db	"Tamanho do arquivo de entrada (em bytes): ", 0	; Mensagem de tamanho do arquivo
-MsgDoneSSize	db	"Tamanho da frase (em bytes): ", 0			; Mensagem de tamanho da frase
-MsgDoneFN		db	"Nome do arquivo de saida: ", 0				; Mensagem de nome do arquivo de saida
+MsgDoneSSize	db	"Tamanho da frase (em bytes): ", 0				; Mensagem de tamanho da frase
+MsgDoneFN		db	"Nome do arquivo de saida: ", 0					; Mensagem de nome do arquivo de saida
 MsgDone			db	"Processamento realizado sem erro", CR, LF, 0	; Mensagem de sucesso
-MsgCRLF			db	CR, LF, 0									; Mensagem de quebra de linha
-FETXT			db	".txt", 0									; Extensao do arquivo de entrada
-FEKRP			db	".krp", 0									; Extensao do arquivo de saida
-HexTable		db  "0123456789ABCDEF",0						; Tabela de conversao de numeros hexadecimais
+MsgCRLF			db	CR, LF, 0										; Mensagem de quebra de linha
+FETXT			db	".txt", 0										; Extensao do arquivo de entrada
+FEKRP			db	".krp", 0										; Extensao do arquivo de saida
+HexTable		db  "0123456789ABCDEF",0							; Tabela de conversao de numeros hexadecimais
 
 	.code
 	.startup
@@ -125,15 +125,6 @@ NextCharInCrypto:
 	cmp		al,'~'				; Verifica se o caractere e maior que ponto de til
 	ja		NextCharInCrypto	; Se for maior, pula para o proximo caractere, caractere invalido
 
-	;!!Nao sei se eh necessario, mas vou deixar aqui, o pdf diz que tem um caso de caracter invalido, mas nao sei qual seria
-	; ; Verifica se o caractere eh valido
-	; cmp		al,' '				; Verifica se o caractere eh um espaco
-	; je		NextCharInCrypto	; Se for um espaco, pula para o proximo caractere
-	; cmp		al,'!'				; Verifica se o caractere e maior que ponto de exclamacao
-	; jb		CryptoStringInvalid	; Se for menor, caractere invalido
-	; cmp		al,'~'				; Verifica se o caractere e maior que ponto de til
-	; ja		CryptoStringInvalid	; Se for maior, caractere invalido
-
 	; Chama a funcao para procurar a letra no arquivo
 	mov		CharSearchStore,al	; Salva o caractere a ser procurado
 	mov		cx,0				; Carrega o indice para o local da frase a ser lido
@@ -185,7 +176,10 @@ EndCryptoStringLoop:
 
 MainEnd:
 	call	NumToFile			; Chama a funcao para converter o numero para string e colocar no arquivo
-	
+	mov		bx,FileHandle		; Fecha arquivo destino
+	call	fclose
+
+	; Printa o tamanho do arquivo de entrada
 	lea		bx,MsgDoneFS		; Carrega o endereco da mensagem de sucesso
 	call	printf_s			; Chama a funcao para imprimir a mensagem de sucesso
 	mov		ax,FileSize			; Carrega o tamanho do arquivo
@@ -194,6 +188,7 @@ MainEnd:
 	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
 	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
 
+	; Printa o tamanho da frase
 	lea		bx,MsgDoneSSize		; Carrega o endereco da mensagem de sucesso
 	call	printf_s			; Chama a funcao para imprimir a mensagem de sucesso
 	lea		bx,Sentence			; Carrega o endereco da frase a ser criptografada
@@ -203,6 +198,7 @@ MainEnd:
 	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
 	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
 
+	; Printa o nome do arquivo de saida
 	lea		bx,MsgDoneFN		; Carrega o endereco da mensagem de sucesso
 	call	printf_s			; Chama a funcao para imprimir a mensagem de sucesso
 	lea		bx,FileName			; Carrega o endereco do nome do arquivo
@@ -212,8 +208,6 @@ MainEnd:
 	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
 	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
 
-	mov		bx,FileHandle		; Fecha arquivo destino
-	call	fclose
 	lea		bx,MsgDone			; Carrega o endereco da mensagem de fim
 	call	printf_s			; Chama a funcao para imprimir a mensagem de fim
 	.exit	0					; Sai do programa
@@ -709,68 +703,72 @@ ps_1:
 printf_s	endp
 
 ;--------------------------------------------------------------------
-;Fun��o: Escreve o valor de AX na tela
-;		printf("%
+;	Subrotina que escreve o valor de AX na tela
+;Entrada:
+;	ax -> valor a ser escrito
+;Saida:
+;	NULL
 ;--------------------------------------------------------------------
 printf_w	proc	near
-	; sprintf_w(AX, BufferWRWORD)
-	lea		bx,BufferWRWORD
-	call	sprintf_w
+	lea		bx,BufferWRWORD	; Carrega o ponteiro para o buffer de escrita
+	call	sprintf_w		; Chama a funcao de escrita
 	
-	; printf_s(BufferWRWORD)
-	lea		bx,BufferWRWORD
-	call	printf_s
-	
+	lea		bx,BufferWRWORD	; Carrega o ponteiro para o buffer de escrita
+	call	printf_s		; Chama a funcao de escrita
 	ret
 printf_w	endp
 
 ;
 ;--------------------------------------------------------------------
-;Fun��o: Converte um inteiro (n) para (string)
-;		 sprintf(string->BX, "%d", n->AX)
+;	Subrotina que Converte um inteiro (n) para (string)
+;Entrada:
+;	ax -> valor a ser escrito
+;	bx -> ponteiro para o buffer
+;Saida:
+;	NULL
 ;--------------------------------------------------------------------
 sprintf_w	proc	near
-	mov		sw_n,ax
-	mov		cx,5
-	mov		sw_m,10000
-	mov		sw_f,0
+	mov		sw_n,ax				; Coloca o valor de ax em sw_n
+	mov		cx,5				; Coloca 5 no cx
+	mov		sw_m,10000			; Coloca 10000 em sw_m
+	mov		sw_f,0				; Coloca 0 em sw_f
 	
 sw_do:
-	mov		dx,0
-	mov		ax,sw_n
-	div		sw_m
+	mov		dx,0				; Coloca 0 em dx
+	mov		ax,sw_n				; Coloca o valor de sw_n em ax
+	div		sw_m				; Divide ax por sw_m
 	
-	cmp		al,0
-	jne		sw_store
-	cmp		sw_f,0
-	je		sw_continue
+	cmp		al,0				; Compara al com 0
+	jne		sw_store			; Se for diferente de 0, pula para sw_store
+	cmp		sw_f,0				; Compara sw_f com 0
+	je		sw_continue			; Se for igual a 0, pula para sw_continue
 sw_store:
-	add		al,'0'
-	mov		[bx],al
-	inc		bx
+	add		al,'0'				; Converte al em caractere
+	mov		[bx],al				; Coloca o caractere em [bx]
+	inc		bx					; Incrementa bx
 	
-	mov		sw_f,1
+	mov		sw_f,1				; Coloca 1 em sw_f
 sw_continue:
 	
-	mov		sw_n,dx
+	mov		sw_n,dx				; Coloca o valor de dx em sw_n
 	
-	mov		dx,0
-	mov		ax,sw_m
-	mov		bp,10
-	div		bp
-	mov		sw_m,ax
+	mov		dx,0				; Coloca 0 em dx
+	mov		ax,sw_m				; Coloca o valor de sw_m em ax
+	mov		bp,10				; Coloca 10 em bp
+	div		bp					; Divide ax por bp
+	mov		sw_m,ax				; Coloca o valor de ax em sw_m
 	
-	dec		cx
-	cmp		cx,0
-	jnz		sw_do
+	dec		cx					; Decrementa cx
+	cmp		cx,0				; Compara cx com 0
+	jnz		sw_do				; Se for diferente de 0, pula para sw_do
 
-	cmp		sw_f,0
-	jnz		sw_continua2
-	mov		byte ptr [bx],'0'
-	inc		bx
+	cmp		sw_f,0				; Compara sw_f com 0
+	jnz		sw_continua2		; Se for diferente de 0, pula para sw_continua2
+	mov		byte ptr [bx],'0'	; Coloca 0 em [bx]
+	inc		bx					; Incrementa bx
 sw_continua2:
 
-	mov		byte ptr[bx],0
+	mov		byte ptr[bx],0		; Coloca 0 em [bx]
 	ret		
 sprintf_w	endp
 ;===============================================================================
