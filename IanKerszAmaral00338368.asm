@@ -20,39 +20,47 @@
 		
 CR		equ		0dh
 LF		equ		0ah
-StringSize	equ	100
+StringSize	equ	254
+MaxSenSize	equ 100
 
 	.data
 
 ;----------------------------------------------------------------------
 ;	Buffers e Variaveis
 ;----------------------------------------------------------------------
-StringBuffer	db	150 dup (?)	; buffer para leitura de strings
-NumBuffer		db	5 dup (?)	; Buffer para leitura de numeros Hexa
-FileBuffer		db	10 dup (?)	; Buffer de leitura/escrita do arquivo
+StringBuffer	db	256 dup (?)				; buffer para leitura de strings
+NumBuffer		db	5 dup (?)				; Buffer para leitura de numeros Hexa
+FileBuffer		db	10 dup (?)				; Buffer de leitura/escrita do arquivo
+FileSizeBuffer	db	5 dup (?)				; Buffer para leitura do tamanho do arquivo
 
-FileName		db	256 dup (?)	; Nome do arquivo de entrada e saida
-FileHandle		dw	0			; Handle do arquivo aberto
+FileName		db	256 dup (?)				; Nome do arquivo de entrada e saida
+FileHandle		dw	0						; Handle do arquivo aberto
 
-Sentence		db	101 dup (?)	; Frase a ser criptografada, 100 caracteres + 0 
-SenLocVec		dw	100 dup (?)	; Vetor de localizacoes ja usadas para a frase
+Sentence		db	MaxSenSize+1 dup (?)	; Frase a ser criptografada, 100 caracteres + 0 
+SenLocVec		dw	MaxSenSize dup (?)		; Vetor de localizacoes ja usadas para a frase
 
-CharSearchStore	db	1 dup (?)	; Letra a ser procurada pela funcao CharSearch
+CharSearchStore	db	1 dup (?)				; Letra a ser procurada pela funcao CharSearch
+
 ;----------------------------------------------------------------------
 ;	Mensagens
 ;----------------------------------------------------------------------
-AskForFile		db	"Nome do arquivo: ", 0				; Mensagem para pedir o nome do arquivo
-AskForSentence	db	"Frase a ser criptografada: ", 0	; Mensagem para pedir a frase a ser criptografada
-MsgErrorOF		db	"Error: abertura do arquivo.", CR, LF, 0	; Mensagem de erro ao abrir o arquivo
-MsgErrorCF		db	"Error: criacao do arquivo.", CR, LF, 0		; Mensagem de erro ao criar o arquivo
-MsgErrorRF		db	"Error: leitura do arquivo.", CR, LF, 0		; Mensagem de erro ao ler o arquivo
-MsgErrorWF		db	"Error: escrita do arquivo.", CR, LF, 0		; Mensagem de erro ao escrever no arquivo
-MsgErrorFS		db	"Error: arquivo de tamanho insuficiente para criptografar a frase.", CR, LF, 0	; Mensagem de erro arquivo de tamanho insuficiente
-MsgErrorRSF		db	"Error: Reset de arquivo.", CR, LF, 0		; Mensagem de erro ao resetar o arquivo
-MsgCRLF			db	CR, LF, 0	; Mensagem de quebra de linha
-FETXT			db	".txt", 0	; Extensao do arquivo de entrada
-FEKRP			db	".krp", 0	; Extensao do arquivo de saida
-HexTable		db  "0123456789ABCDEF",0	; Tabela de conversao de numeros hexadecimais
+AskForFile		db	"Nome do arquivo: ", 0						; Mensagem para pedir o nome do arquivo
+AskForSentence	db	"Frase a ser criptografada: ", 0			; Mensagem para pedir a frase a ser criptografada
+MsgErrorOF		db	"Error: Abrir o arquivo.", CR, LF, 0		; Mensagem de erro ao abrir o arquivo
+MsgErrorCF		db	"Error: Criar o arquivo.", CR, LF, 0		; Mensagem de erro ao criar o arquivo
+MsgErrorRF		db	"Error: Leitura do arquivo.", CR, LF, 0		; Mensagem de erro ao ler o arquivo
+MsgErrorWF		db	"Error: Escrita do arquivo.", CR, LF, 0		; Mensagem de erro ao escrever no arquivo
+MsgErrorRSF		db	"Error: Reiniciar o arquivo.", CR, LF, 0	; Mensagem de erro ao resetar o arquivo
+MsgErrorFTS		db	"Error: Simbolo nao encontrado.", CR, LF, 0	; Mensagem de erro arquivo de tamanho insuficiente
+MSgErrorFTL		db	"Error: Arquivo muito grande.", CR, LF, 0	; Mensagem de erro arquivo de tamanho excessivo
+MsgErrorSOF		db	"Error: Frase muito grande.", CR, LF, 0		; Mensagem de erro frase muito grande
+MsgErrorSE		db	"Error: Frase vazia.", CR, LF, 0			; Mensagem de erro frase nao pode ser vazia
+MsgErrorSIC		db	"Error: Caracteres invalidos.", CR, LF, 0	; Mensagem de erro frase com caracteres invalidos
+MsgDone			db	"Processamento realizado sem erro.", CR, LF, 0	; Mensagem de sucesso
+MsgCRLF			db	CR, LF, 0									; Mensagem de quebra de linha
+FETXT			db	".txt", 0									; Extensao do arquivo de entrada
+FEKRP			db	".krp", 0									; Extensao do arquivo de saida
+HexTable		db  "0123456789ABCDEF",0						; Tabela de conversao de numeros hexadecimais
 
 	.code
 	.startup
@@ -108,6 +116,15 @@ NextCharInCrypto:
 	cmp		al,'~'				; Verifica se o caractere e maior que ponto de til
 	ja		NextCharInCrypto	; Se for maior, pula para o proximo caractere, caractere invalido
 
+	;!!Nao sei se eh necessario, mas vou deixar aqui, o pdf diz que tem um caso de caracter invalido, mas nao sei qual seria
+	; ; Verifica se o caractere eh valido
+	; cmp		al,' '				; Verifica se o caractere eh um espaco
+	; je		NextCharInCrypto	; Se for um espaco, pula para o proximo caractere
+	; cmp		al,'!'				; Verifica se o caractere e maior que ponto de exclamacao
+	; jb		CryptoStringInvalid	; Se for menor, caractere invalido
+	; cmp		al,'~'				; Verifica se o caractere e maior que ponto de til
+	; ja		CryptoStringInvalid	; Se for maior, caractere invalido
+
 	; Chama a funcao para procurar a letra no arquivo
 	mov		CharSearchStore,al	; Salva o caractere a ser procurado
 	mov		cx,0				; Carrega o indice para o local da frase a ser lido
@@ -131,6 +148,10 @@ Revisar:
 SetVetor:
 	mov		[SenLocVec+di],cx	; Coloca a localizacao no vetor de localizacoes
 	jmp		NextCharInCrypto	; Pula para o proximo caractere da frase a ser criptografada
+
+CryptoStringInvalid:
+	lea		bx,MsgErrorSIC
+	call	FileErrorHdlr
 
 EndCryptoString:
 	mov		bx,FileHandle		; Fecha arquivo origem, ele nao sera mais usado
@@ -156,6 +177,8 @@ EndCryptoStringLoop:
 MainEnd:
 	mov		bx,FileHandle		; Fecha arquivo destino
 	call	fclose
+	lea		bx,MsgDone			; Carrega o endereco da mensagem de fim
+	call	printf_s			; Chama a funcao para imprimir a mensagem de fim
 	.exit	0					; Sai do programa
 
 ;===============================================================================
@@ -222,10 +245,11 @@ AEOFOpen:
 	pop		bx				; Carrega o ponteiro para o local do handler no bx
 	mov		[bx],cx			; Coloca o handle no local de saida
 	jnc		AEOFCleanup		; Se nao houve erro, pula para a funcao de limpeza
-	lea		bx, MsgErrorOF
+	lea		bx, MsgErrorOF	; Carrega o ponteiro para a mensagem de erro
 	call	FileErrorHdlr	; Chama a funcao para tratar o erro
 
 AEOFCleanup:
+	call	CheckFileSize	; Chama a funcao para verificar o tamanho do arquivo
 	mov		bx,dx			; Carrega o ponteiro para o nome do arquivo no bx
 	call	Strlen			; Chama a funcao para calcular o tamanho do nome do arquivo
 	mov		cx,4			; Carrega o tamanho da extensao no cx
@@ -271,27 +295,42 @@ Strlen	endp
 ;   NULL
 ;--------------------------------------------------------------------
 Print_FAndGetS	proc	near
-	push 	ax				; Salva o ponteiro para o local de saida
-	call	printf_s		; Chama a funcao para mostrar a string
+	push 	ax					; Salva o ponteiro para o local de saida
+	call	printf_s			; Chama a funcao para mostrar a string
 
-	mov		ah,0ah			; Carrega o codigo da funcao para ler uma string do teclado
-	lea		dx,StringBuffer	; Carrega o ponteiro para o buffer de leitura
+	mov		ah,0ah				; Carrega o codigo da funcao para ler uma string do teclado
+	lea		dx,StringBuffer		; Carrega o ponteiro para o buffer de leitura
 	mov		byte ptr StringBuffer,StringSize	; Coloca o tamanho do buffer no primeiro byte
-	int		21h				; Chama a funcao para ler a string do teclado
+	int		21h					; Chama a funcao para ler a string do teclado
+
+	cmp		StringBuffer+1,MaxSenSize
+	ja		PFAGSErrorSOF		; Se o tamanho da string for maior que o maximo, pula para a funcao de erro
+	
+	cmp		StringBuffer+1,0
+	je		PFAGSErrorSE		; Se o tamanho da string for igual a 0, pula para a funcao de erro
+
 
 	lea		si,StringBuffer+2	; Copia do buffer de teclado para o FileName
-	pop		di				; Carrega o ponteiro para o local de saida no di
+	pop		di					; Carrega o ponteiro para o local de saida no di
 	mov		cl,StringBuffer+1	; Carrega o tamanho da string no cl
-	mov		ch,0			; Coloca 0 no ch
-	mov		ax,ds			; Ajusta ES=DS para poder usar o MOVSB
-	mov		es,ax			; Ajusta ES=DS para poder usar o MOVSB
-	rep 	movsb			; Copia a string do buffer para o local de saida
+	mov		ch,0				; Coloca 0 no ch
+	mov		ax,ds				; Ajusta ES=DS para poder usar o MOVSB
+	mov		es,ax				; Ajusta ES=DS para poder usar o MOVSB
+	rep 	movsb				; Copia a string do buffer para o local de saida
 
 	mov		byte ptr es:[di],0	; Coloca marca de fim de string
 		
-	lea		bx,MsgCRLF		; Carrega o ponteiro para a string de quebra de linha
-	call	printf_s		; Chama a funcao para mostrar a string de quebra de linha
+	lea		bx,MsgCRLF			; Carrega o ponteiro para a string de quebra de linha
+	call	printf_s			; Chama a funcao para mostrar a string de quebra de linha
 	ret
+
+PFAGSErrorSOF:
+	lea		bx,MsgErrorSOF		; Carrega o ponteiro para a mensagem de erro
+	call	FileErrorHdlr		; Chama a funcao para tratar o erro
+
+PFAGSErrorSE:
+	lea		bx,MsgErrorSE		; Carrega o ponteiro para a mensagem de erro
+	call	FileErrorHdlr		; Chama a funcao para tratar o erro
 Print_FAndGetS	endp
 
 
@@ -339,7 +378,7 @@ SearchCharInFileErrorRC:
 	call	FileErrorHdlr		; Chama a funcao de tratamento de erro
 
 SearchCharInFileErrorEOF:
-	lea		bx, MsgErrorFS		; Carrega o ponteiro para a string de erro
+	lea		bx, MsgErrorFTS		; Carrega o ponteiro para a string de erro
 	call	FileErrorHdlr		; Chama a funcao de tratamento de erro
 SearchCharInFile	endp
 
@@ -358,12 +397,12 @@ ResetFile	proc	near
 	mov 	al,0				; Posiciona o ponteiro no inicio do arquivo (Seek_Set)
 	mov		cx,0				; Pega o offset do arquivo desejado (parte maior)
 	int		21h					; interrupt de arquivo
-	jc		ResetFileSrc_error	; Se houve erro na leitura do arquivo, pula para a funcao de tratamento de erro
+	jc		ResetFileSrcError	; Se houve erro na leitura do arquivo, pula para a funcao de tratamento de erro
 	pop 	cx					; Restaura o cx
 	pop		ax					; Restaura o ax
 	ret
 
-ResetFileSrc_error:
+ResetFileSrcError:
 	lea		bx,MsgErrorRSF		; Carrega o ponteiro para a string de erro
 	call	FileErrorHdlr		; Chama a funcao de tratamento de erro
 ResetFile	endp
@@ -459,6 +498,10 @@ HexToString endp
 ; 	!!TERMINA O PROGRAMA!!
 ;--------------------------------------------------------------------
 FileErrorHdlr	proc	near
+	push	bx					; Salva o bx
+	lea		bx,MsgCRLF			; Carrega o ponteiro para a string de quebra de linha
+	call	printf_s			; Chama a funcao para mostrar a string de quebra de linha
+	pop		bx					; Restaura o bx
 	call	printf_s			; Chama a funcao para mostrar a string de erro
 	mov		bx,FileHandle		; Carrega o FileHandle
 	cmp		bx,0				; Compara o FileHandle com 0
@@ -468,6 +511,52 @@ FileErrorHdlr	proc	near
 FileErrorHdlrEnd:
 	.exit 1						; Sai do programa com codigo de erro 1
 FileErrorHdlr	endp
+
+;--------------------------------------------------------------------
+;	Subrotina que Testa se o tamanho do arquivo e valido
+;Entrada:
+;	NULL
+;Saida:
+;	NULL
+;--------------------------------------------------------------------
+CheckFileSize	proc	near
+	push 	ax					; Salva o ax
+	push 	bx					; Salva o bx
+	push 	cx					; Salva o cx
+	push 	dx					; Salva o dx
+	
+	mov		cx,0				; Coloca 0 no cx
+	push	cx					; Salva o cx
+	mov		bx,FileHandle		; Carrega o FileHandle
+	
+
+CheckFileSizeLoop:
+	mov		ah,3fh				; Coloca 3fh no ah
+	lea		dx,FileSizeBuffer	; Carrega o ponteiro para o buffer de tamanho do arquivo
+	mov		cx,1				; Coloca 1 no cx
+	int		21h					; Chama a funcao 21h
+	mov		dl,FileSizeBuffer	; Coloca o caractere lido em dl
+	pop		cx					; Restaura o cx
+	inc		cx					; Incrementa o cx
+	jc		CheckFileSizeError	; Se houve overflow, pula para a funcao de tratamento de erro, o arquivo e maior que 64kBytes
+	cmp		ax,0				; Compara o ax com 0
+	je		CheckFileSizeEnd	; Se chegou no final, pula para a funcao de tratamento de erro
+	push	cx					; Salva o cx
+	jmp		CheckFileSizeLoop	; Volta para o inicio do loop
+
+CheckFileSizeEnd:
+	mov		dx,0				; Coloca 0 no dx, offset do arquivo
+	call	ResetFile 			; Chama a funcao para resetar o arquivo
+	pop		dx					; Restaura o dx
+	pop		cx					; Restaura o cx
+	pop		bx					; Restaura o bx
+	pop		ax					; Restaura o ax
+	ret
+
+CheckFileSizeError:
+	lea		bx,MSgErrorFTL		; Carrega o ponteiro para a string de erro
+	call	FileErrorHdlr		; Chama a funcao de tratamento de erro
+CheckFileSize	endp
 
 ;###############################################################################
 ;	Subrotinas retiradas dos materiais de aula
