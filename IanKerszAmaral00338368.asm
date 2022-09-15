@@ -32,6 +32,7 @@ StringBuffer	db	256 dup (?)				; buffer para leitura de strings
 NumBuffer		db	5 dup (?)				; Buffer para leitura de numeros Hexa
 FileBuffer		db	10 dup (?)				; Buffer de leitura/escrita do arquivo
 FileSizeBuffer	db	5 dup (?)				; Buffer para leitura do tamanho do arquivo
+FileSize		dw	0						; Tamanho do arquivo
 
 FileName		db	256 dup (?)				; Nome do arquivo de entrada e saida
 FileHandle		dw	0						; Handle do arquivo aberto
@@ -40,6 +41,11 @@ Sentence		db	MaxSenSize+1 dup (?)	; Frase a ser criptografada, 100 caracteres + 
 SenLocVec		dw	MaxSenSize dup (?)		; Vetor de localizacoes ja usadas para a frase
 
 CharSearchStore	db	1 dup (?)				; Letra a ser procurada pela funcao CharSearch
+
+BufferWRWORD	db	10 dup (?)				; Variavel interna usada na rotina printf_w
+sw_n			dw	0						; Variavel para uso interno na funcao sprintf_w
+sw_f			db	0						; Variavel para uso interno na funcao sprintf_w
+sw_m			dw	0						; Variavel para uso interno na funcao sprintf_w
 
 ;----------------------------------------------------------------------
 ;	Mensagens
@@ -175,6 +181,28 @@ EndCryptoStringLoop:
 	jmp		EndCryptoStringLoop	; Volta para a funcao de revisar o vetor de localizacoes
 
 MainEnd:
+	call	NumToFile			; Chama a funcao para converter o numero para string e colocar no arquivo
+	
+	mov		ax,FileSize			; Carrega o tamanho do arquivo
+	dec		ax					; Decrementa o tamanho do arquivo para o tamanho real
+	call	printf_w			; Chama a funcao para imprimir o tamanho do arquivo
+	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
+	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
+
+	lea		bx,Sentence			; Carrega o endereco da frase a ser criptografada
+	call	Strlen				; Chama a funcao para calcular o tamanho da frase
+	mov		ax,di				; Carrega o tamanho da frase
+	call	printf_w			; Chama a funcao para imprimir o tamanho da frase
+	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
+	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
+
+	lea		bx,FileName			; Carrega o endereco do nome do arquivo
+	call	printf_s			; Chama a funcao para imprimir o nome do arquivo
+	lea		bx,FEKRP			; Carrega o endereco da extensao do arquivo de saida
+	call	printf_s			; Chama a funcao para imprimir a extensao do arquivo de saida
+	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
+	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
+
 	mov		bx,FileHandle		; Fecha arquivo destino
 	call	fclose
 	lea		bx,MsgDone			; Carrega o endereco da mensagem de fim
@@ -244,12 +272,12 @@ AEOFOpen:
 	mov		cx,bx			; Carrega o Handle do arquivo no cx
 	pop		bx				; Carrega o ponteiro para o local do handler no bx
 	mov		[bx],cx			; Coloca o handle no local de saida
+	call	CheckFileSize	; Chama a funcao para verificar o tamanho do arquivo
 	jnc		AEOFCleanup		; Se nao houve erro, pula para a funcao de limpeza
 	lea		bx, MsgErrorOF	; Carrega o ponteiro para a mensagem de erro
 	call	FileErrorHdlr	; Chama a funcao para tratar o erro
 
 AEOFCleanup:
-	call	CheckFileSize	; Chama a funcao para verificar o tamanho do arquivo
 	mov		bx,dx			; Carrega o ponteiro para o nome do arquivo no bx
 	call	Strlen			; Chama a funcao para calcular o tamanho do nome do arquivo
 	mov		cx,4			; Carrega o tamanho da extensao no cx
@@ -434,9 +462,6 @@ NTFLoop:
 	jmp		NTFLoop				; Volta para o inicio do loop
 	
 NTFEnd:
-	mov		bx,FileHandle		; Carrega o FileHandle
-	mov		dl,' '				; Carrega o caractere de espaco
-	call 	setChar				; Chama a funcao para escrever o caractere no arquivo
 	pop		di					; Restaura o di
 	pop		dx					; Restaura o dx
 	pop		bx					; Restaura o bx
@@ -524,6 +549,7 @@ CheckFileSize	proc	near
 	push 	bx					; Salva o bx
 	push 	cx					; Salva o cx
 	push 	dx					; Salva o dx
+	pushf
 	
 	mov		cx,0				; Coloca 0 no cx
 	push	cx					; Salva o cx
@@ -538,6 +564,7 @@ CheckFileSizeLoop:
 	mov		dl,FileSizeBuffer	; Coloca o caractere lido em dl
 	pop		cx					; Restaura o cx
 	inc		cx					; Incrementa o cx
+	mov		FileSize,cx			; Coloca o tamanho do arquivo em FileSize
 	jc		CheckFileSizeError	; Se houve overflow, pula para a funcao de tratamento de erro, o arquivo e maior que 64kBytes
 	cmp		ax,0				; Compara o ax com 0
 	je		CheckFileSizeEnd	; Se chegou no final, pula para a funcao de tratamento de erro
@@ -547,6 +574,7 @@ CheckFileSizeLoop:
 CheckFileSizeEnd:
 	mov		dx,0				; Coloca 0 no dx, offset do arquivo
 	call	ResetFile 			; Chama a funcao para resetar o arquivo
+	popf
 	pop		dx					; Restaura o dx
 	pop		cx					; Restaura o cx
 	pop		bx					; Restaura o bx
@@ -670,6 +698,72 @@ printf_s	proc	near
 ps_1:
 	ret						; Retorna
 printf_s	endp
+
+;--------------------------------------------------------------------
+;Fun��o: Escreve o valor de AX na tela
+;		printf("%
+;--------------------------------------------------------------------
+printf_w	proc	near
+	; sprintf_w(AX, BufferWRWORD)
+	lea		bx,BufferWRWORD
+	call	sprintf_w
+	
+	; printf_s(BufferWRWORD)
+	lea		bx,BufferWRWORD
+	call	printf_s
+	
+	ret
+printf_w	endp
+
+;
+;--------------------------------------------------------------------
+;Fun��o: Converte um inteiro (n) para (string)
+;		 sprintf(string->BX, "%d", n->AX)
+;--------------------------------------------------------------------
+sprintf_w	proc	near
+	mov		sw_n,ax
+	mov		cx,5
+	mov		sw_m,10000
+	mov		sw_f,0
+	
+sw_do:
+	mov		dx,0
+	mov		ax,sw_n
+	div		sw_m
+	
+	cmp		al,0
+	jne		sw_store
+	cmp		sw_f,0
+	je		sw_continue
+sw_store:
+	add		al,'0'
+	mov		[bx],al
+	inc		bx
+	
+	mov		sw_f,1
+sw_continue:
+	
+	mov		sw_n,dx
+	
+	mov		dx,0
+	mov		ax,sw_m
+	mov		bp,10
+	div		bp
+	mov		sw_m,ax
+	
+	dec		cx
+	cmp		cx,0
+	jnz		sw_do
+
+	cmp		sw_f,0
+	jnz		sw_continua2
+	mov		byte ptr [bx],'0'
+	inc		bx
+sw_continua2:
+
+	mov		byte ptr[bx],0
+	ret		
+sprintf_w	endp
 ;===============================================================================
 		end
 ;===============================================================================
