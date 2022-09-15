@@ -62,7 +62,10 @@ MSgErrorFTL		db	"Error: Arquivo muito grande.", CR, LF, 0	; Mensagem de erro arq
 MsgErrorSOF		db	"Error: Frase muito grande.", CR, LF, 0		; Mensagem de erro frase muito grande
 MsgErrorSE		db	"Error: Frase vazia.", CR, LF, 0			; Mensagem de erro frase nao pode ser vazia
 MsgErrorSIC		db	"Error: Caracteres invalidos.", CR, LF, 0	; Mensagem de erro frase com caracteres invalidos
-MsgDone			db	"Processamento realizado sem erro.", CR, LF, 0	; Mensagem de sucesso
+MsgDoneFS		db	"Tamanho do arquivo de entrada (em bytes): ", 0	; Mensagem de tamanho do arquivo
+MsgDoneSSize	db	"Tamanho da frase (em bytes): ", 0			; Mensagem de tamanho da frase
+MsgDoneFN		db	"Nome do arquivo de saida: ", 0				; Mensagem de nome do arquivo de saida
+MsgDone			db	"Processamento realizado sem erro", CR, LF, 0	; Mensagem de sucesso
 MsgCRLF			db	CR, LF, 0									; Mensagem de quebra de linha
 FETXT			db	".txt", 0									; Extensao do arquivo de entrada
 FEKRP			db	".krp", 0									; Extensao do arquivo de saida
@@ -183,12 +186,16 @@ EndCryptoStringLoop:
 MainEnd:
 	call	NumToFile			; Chama a funcao para converter o numero para string e colocar no arquivo
 	
+	lea		bx,MsgDoneFS		; Carrega o endereco da mensagem de sucesso
+	call	printf_s			; Chama a funcao para imprimir a mensagem de sucesso
 	mov		ax,FileSize			; Carrega o tamanho do arquivo
 	dec		ax					; Decrementa o tamanho do arquivo para o tamanho real
 	call	printf_w			; Chama a funcao para imprimir o tamanho do arquivo
 	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
 	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
 
+	lea		bx,MsgDoneSSize		; Carrega o endereco da mensagem de sucesso
+	call	printf_s			; Chama a funcao para imprimir a mensagem de sucesso
 	lea		bx,Sentence			; Carrega o endereco da frase a ser criptografada
 	call	Strlen				; Chama a funcao para calcular o tamanho da frase
 	mov		ax,di				; Carrega o tamanho da frase
@@ -196,6 +203,8 @@ MainEnd:
 	lea		bx,MsgCRLF			; Carrega o endereco da mensagem de fim de linha
 	call	printf_s			; Chama a funcao para imprimir a mensagem de fim de linha
 
+	lea		bx,MsgDoneFN		; Carrega o endereco da mensagem de sucesso
+	call	printf_s			; Chama a funcao para imprimir a mensagem de sucesso
 	lea		bx,FileName			; Carrega o endereco do nome do arquivo
 	call	printf_s			; Chama a funcao para imprimir o nome do arquivo
 	lea		bx,FEKRP			; Carrega o endereco da extensao do arquivo de saida
