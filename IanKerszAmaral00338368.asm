@@ -61,6 +61,7 @@ MsgErrorFTS		db	"Error: Simbolo nao encontrado.", CR, LF, 0		; Mensagem de erro 
 MSgErrorFTL		db	"Error: Arquivo muito grande.", CR, LF, 0		; Mensagem de erro arquivo de tamanho excessivo
 MsgErrorSOF		db	"Error: Frase muito grande.", CR, LF, 0			; Mensagem de erro frase muito grande
 MsgErrorSE		db	"Error: Frase vazia.", CR, LF, 0				; Mensagem de erro frase nao pode ser vazia
+MsgErrorSIC		db	"Error: Caracteres invalidos.", CR, LF, 0 		; Mensagem de erro frase com caracteres invalidos
 MsgDoneFS		db	"Tamanho do arquivo de entrada (em bytes): ", 0	; Mensagem de tamanho do arquivo
 MsgDoneSSize	db	"Tamanho da frase (em bytes): ", 0				; Mensagem de tamanho da frase
 MsgDoneFN		db	"Nome do arquivo de saida: ", 0					; Mensagem de nome do arquivo de saida
@@ -95,6 +96,7 @@ Main:
 	call 	Print_FAndGetS		; Chama a funcao para imprimir a mensagem e ler a string
 	
 	; Ajusta os parametros para a funcao de criptografia
+	call	CheckString			; Chama a funcao para verificar a frase a ser criptografada nao tem erros
 	lea		bx,Sentence			; Carrega o endereco da frase a ser criptografada
 	mov		di,0				; Carrega o indice para o local da frase a ser lido
 	push	bx					; Salva o ponteiro na pilha
@@ -586,6 +588,41 @@ CheckFileSizeError:
 	lea		bx,MSgErrorFTL		; Carrega o ponteiro para a string de erro
 	call	FileErrorHdlr		; Chama a funcao de tratamento de erro
 CheckFileSize	endp
+
+CheckString		proc	near
+	push 	ax					; Salva o ax
+	push 	bx					; Salva o bx
+	push 	cx					; Salva o cx
+	push 	dx					; Salva o dx
+	push	di
+	pushf
+
+	mov		di,0				; Coloca 0 no di
+CheckStringLoop:
+	mov		al,[Sentence+di]	; Coloca o caractere lido em al
+	cmp		al,0				; Verifica se e o final da string
+	je		CheckStringEnd		; Se for, pula para o fim da funcao
+	cmp		al,' '				; Verifica se e um espaco
+	jb		CheckStringError	; Se for menor, pula para o erro da funcao
+	cmp		al,'~'				; Verifica se e um ~
+	ja		CheckStringError	; Se for maior, pula para o erro da funcao
+	inc		di					; Incrementa o di
+	jmp		CheckStringLoop		; Volta para o inicio do loop
+	
+CheckStringEnd:
+	popf
+	pop		di
+	pop		dx					; Restaura o dx
+	pop		cx					; Restaura o cx
+	pop		bx					; Restaura o bx
+	pop		ax					; Restaura o ax
+	ret
+
+CheckStringError:
+	lea		bx,MsgErrorSIC		; Carrega o ponteiro para a string de erro
+	call	FileErrorHdlr		; Chama a funcao de tratamento de erro
+
+CheckString	endp
 
 ;###############################################################################
 ;	Subrotinas retiradas dos materiais de aula
