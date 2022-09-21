@@ -29,7 +29,6 @@ MaxSenSize	equ 100
 ;	Buffers e Variaveis
 ;----------------------------------------------------------------------
 StringBuffer	db	256 dup (?)				; buffer para leitura de strings
-NumBuffer		db	5 dup (?)				; Buffer para leitura de numeros Hexa
 FileBuffer		db	10 dup (?)				; Buffer de leitura/escrita do arquivo
 FileSizeBuffer	db	5 dup (?)				; Buffer para leitura do tamanho do arquivo
 FileSize		dw	0						; Tamanho do arquivo
@@ -69,7 +68,6 @@ MsgDone			db	"Processamento realizado sem erro", CR, LF, 0	; Mensagem de sucesso
 MsgCRLF			db	CR, LF, 0										; Mensagem de quebra de linha
 FETXT			db	".txt", 0										; Extensao do arquivo de entrada
 FEKRP			db	".krp", 0										; Extensao do arquivo de saida
-HexTable		db  "0123456789ABCDEF",0							; Tabela de conversao de numeros hexadecimais
 
 	.code
 	.startup
@@ -444,81 +442,44 @@ ResetFile	endp
 ;	NULL
 ;--------------------------------------------------------------------
 NumToFile	proc	near
-	push	ax					; Salva o ax
 	push	bx					; Salva o bx
+	push	cx
 	push	dx					; Salva o dx
 	push	di					; Salva o di
-	lea		bx,NumBuffer		; Carrega o ponteiro para o buffer de saida
-	call	HexToString			; Chama a funcao para transcricao
-	mov		di,0				; Coloca 0 no di
+	mov		cx,16				; Numero de digitos a serem transcritos
+	push	ax					; Salva o ax
 
 NTFLoop:
-	mov		dl,[NumBuffer+di]	; Carrega o caractere do buffer
-	cmp 	dl,0				; Compara o caractere com 0 (fim da string)
-	je		NTFEnd				; Se for 0, pula para o fim da funcao
+	pop		ax					; Restaura o ax
+	shr		ax,1				; Desloca o numero para a direita
+	push	ax					; Salva o ax
+	jnc		NTFZero				; Se carry for 0, pula para a funcao de colocar 0 no arquivo
+
+NTFOne:
+	mov 	dl,'1'				; Carrega o caractere 1
+	jmp		NTFWrite			; Pula para a funcao de escrita
+
+NTFZero:
+	mov		dl,'0'				; Carrega o caractere 0
+
+NTFWrite:
 	mov		bx,FileHandle		; Carrega o FileHandle
 	call	setChar				; Chama a funcao para escrever o caractere no arquivo
 	jc		NTFError			; Se houve erro na escrita do arquivo, pula para a funcao de tratamento de erro
-	inc		di					; Incrementa o di
-	jmp		NTFLoop				; Volta para o inicio do loop
+	loop	NTFLoop				; Repete o loop
 	
 NTFEnd:
+	pop		ax					; Restaura o ax
 	pop		di					; Restaura o di
 	pop		dx					; Restaura o dx
+	pop		cx
 	pop		bx					; Restaura o bx
-	pop		ax					; Restaura o ax
 	ret
 
 NTFError:
 	lea		bx, MsgErrorWF		; Carrega o ponteiro para a string de erro
 	call	FileErrorHdlr		; Chama a funcao de tratamento de erro
 NumToFile	endp
-
-;--------------------------------------------------------------------
-;	Subrotina que converte um inteiro para string em hexadecimal
-;Entrada:
-;	ax -> numero a ser transcrito
-;	bx -> ponteiro para o buffer de saida
-;Saida:
-;	NULL
-;--------------------------------------------------------------------
-HexToString proc near
-	push 	ax					; Salva o ax
-	push	cx					; Salva o cx
-	push	dx					; Salva o dx
-	push 	di					; Salva o di
-
-	lea		dx,HexTable			; Carrega o ponteiro para a tabela de conversao
-	mov		cx,4				; Coloca 4 no cx
-	mov		di,0				; Coloca 0 no di
-
-ByteLoop:
-	push 	cx					; Salva o cx que conta as repeticoes do loop principal
-	mov		cx,12				; Coloca 12 no cx que conta as repeticoes do loop secundario
-ByteLoop2:
-	ror		ax,1				; Rotaciona o ax 12 bits para a direita
-	loop 	ByteLoop2			; Repete o loop secundario 12 vezes
-	push	ax					; Salva o ax
-	and		ax,000Fh			; Pega os 4 bits menos significativos
-
-	xchg	bx,dx				; Troca o conteudo de bx e dx
-	xlat						; Converte o byte em ax para o caractere correspondente
-	xchg	bx,dx				; Troca o conteudo de bx e dx
-	mov		[bx+di],al			; Coloca o caractere convertido no buffer
-
-	inc		di					; Incrementa o di
-	pop		ax					; Restaura o ax
-	pop		cx					; Restaura o cx
-	loop	ByteLoop			; Volta para o inicio do loop principal
-
-	mov		[bx+di],cl			; Coloca o caractere de fim de string no buffer (por causa do loop cl vai ser 0)
-	
-	pop		di					; Restaura o di
-	pop		dx					; Restaura o dx
-	pop		cx					; Restaura o cx
-	pop		ax					; Restaura o ax
-	ret
-HexToString endp
 
 ;--------------------------------------------------------------------
 ;	Subrotina que mostra o erro e fecha o arquivo caso ele esteja aberto
