@@ -493,7 +493,11 @@ HexToString proc near
 	mov		di,0				; Coloca 0 no di
 
 ByteLoop:
-	ror		ax,12				; Rotaciona o ax 12 bits para a direita
+	push 	cx
+	mov		cx,12
+ByteLoop2:
+	ror		ax,1				; Rotaciona o ax 12 bits para a direita
+	loop 	ByteLoop2
 	push	ax					; Salva o ax
 	and		ax,000Fh			; Pega os 4 bits menos significativos
 
@@ -504,6 +508,7 @@ ByteLoop:
 
 	inc		di					; Incrementa o di
 	pop		ax					; Restaura o ax
+	pop		cx
 	loop	ByteLoop			; Volta para o inicio do loop
 
 	mov		[bx+di],cl			; Coloca o caractere de fim de string no buffer (por causa do loop cl vai ser 0)
