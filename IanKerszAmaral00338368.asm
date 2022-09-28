@@ -443,36 +443,23 @@ ResetFile	endp
 ;--------------------------------------------------------------------
 NumToFile	proc	near
 	push	bx					; Salva o bx
-	push	cx
+	push	cx					; Salva o cx
 	push	dx					; Salva o dx
 	push	di					; Salva o di
-	mov		cx,16				; Numero de digitos a serem transcritos
-	push	ax					; Salva o ax
 
-NTFLoop:
-	pop		ax					; Restaura o ax
-	shr		ax,1				; Desloca o numero para a direita
-	push	ax					; Salva o ax
-	jnc		NTFZero				; Se carry for 0, pula para a funcao de colocar 0 no arquivo
-
-NTFOne:
-	mov 	dl,'1'				; Carrega o caractere 1
-	jmp		NTFWrite			; Pula para a funcao de escrita
-
-NTFZero:
-	mov		dl,'0'				; Carrega o caractere 0
-
-NTFWrite:
+	mov		dl,al				; Carrega o caractere em al
 	mov		bx,FileHandle		; Carrega o FileHandle
 	call	setChar				; Chama a funcao para escrever o caractere no arquivo
 	jc		NTFError			; Se houve erro na escrita do arquivo, pula para a funcao de tratamento de erro
-	loop	NTFLoop				; Repete o loop
-	
-NTFEnd:
-	pop		ax					; Restaura o ax
+
+	mov		dl,ah				; Carrega o caractere em ah
+	mov		bx,FileHandle		; Carrega o FileHandle
+	call	setChar				; Chama a funcao para escrever o caractere no arquivo
+	jc		NTFError			; Se houve erro na escrita do arquivo, pula para a funcao de tratamento de erro
+
 	pop		di					; Restaura o di
 	pop		dx					; Restaura o dx
-	pop		cx
+	pop		cx					; Restaura o cx
 	pop		bx					; Restaura o bx
 	ret
 
