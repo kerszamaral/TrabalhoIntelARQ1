@@ -542,6 +542,13 @@ CheckFileSizeError:
 	call	FileErrorHdlr		; Chama a funcao de tratamento de erro
 CheckFileSize	endp
 
+;--------------------------------------------------------------------
+;	Subrotina que testa se a string e valido
+;Entrada:
+;	NULL
+;Saida:
+;	NULL
+;--------------------------------------------------------------------
 CheckString		proc	near
 	push 	ax					; Salva o ax
 	push 	bx					; Salva o bx
